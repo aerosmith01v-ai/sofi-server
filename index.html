@@ -1,14 +1,15 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SOFI — HaaPpDigitalV</title>
 <meta name="theme-color" content="#6200EA">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SOFI">
 <link rel="manifest" href="data:application/json,{
-  'name':'SOFI App Oficial',
+  'name':'SOFI',
   'short_name':'SOFI',
   'start_url':'/',
   'display':'standalone',
@@ -17,466 +18,135 @@
 }">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
-:root{--p:#6200EA;--p2:#4A00CC;--bg:#F0ECF9;--card:#fff;--text:#333;--gray:#666}
-body{background:var(--bg);color:var(--text);min-height:100vh}
+:root{--p:#6200EA;--bg:#F0ECF9;--card:#fff;--txt:#333}
+body{background:var(--bg);min-height:100vh}
 
 /* HEADER */
-.header{background:linear-gradient(135deg,var(--p),var(--p2));padding:20px;text-align:center;color:#fff;position:relative}
-.sofi-orb{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.2);border:3px solid rgba(255,255,255,0.5);margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:36px;animation:pulse 3s ease-in-out infinite;cursor:pointer}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,0.3)}50%{box-shadow:0 0 0 15px rgba(255,255,255,0)}}
-.header h1{font-size:22px;letter-spacing:3px;font-weight:700}
-.header p{font-size:11px;opacity:0.8;letter-spacing:1px;margin-top:3px}
-.voz-badge{background:rgba(255,193,7,0.9);color:#333;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:bold;margin-top:8px;display:inline-block;display:none}
-.status-bar{display:flex;justify-content:center;gap:12px;margin-top:10px}
-.status-dot{width:8px;height:8px;border-radius:50%;background:#4CAF50;animation:blink 2s infinite}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
-.status-text{font-size:10px;opacity:0.8}
+.header{background:linear-gradient(135deg,var(--p),#4A00CC);padding:20px;text-align:center;color:#fff}
+.sofi-orb{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.2);border:3px solid #fff;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:36px}
+.header h1{font-size:22px;letter-spacing:3px}
+.header p{font-size:11px;opacity:0.8}
 
 /* NAV */
-nav{display:flex;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.1);position:sticky;top:0;z-index:100;overflow-x:auto}
-nav::-webkit-scrollbar{display:none}
-.tab{flex:1;min-width:70px;padding:12px 6px;border:none;background:transparent;font-size:10px;font-weight:600;color:var(--gray);cursor:pointer;border-bottom:3px solid transparent;transition:all 0.3s;text-align:center}
-.tab.active{color:var(--p);border-bottom-color:var(--p)}
-.tab-icon{display:block;font-size:18px;margin-bottom:3px}
-
-/* CONTENT */
-.content{padding:16px;max-width:480px;margin:0 auto}
-.panel{display:none}.panel.active{display:block;animation:fadeIn 0.3s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.nav{display:flex;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,0.1);overflow-x:auto}
+.nav-btn{flex:1;min-width:80px;padding:15px;border:none;background:transparent;color:var(--txt);font-size:12px}
+.nav-btn.active{color:var(--p);border-bottom:2px solid var(--p)}
 
 /* CARDS */
-.card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
-.card-title{font-size:11px;font-weight:700;color:var(--p);letter-spacing:1.5px;margin-bottom:12px;text-transform:uppercase}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.metric{background:var(--bg);border-radius:8px;padding:14px;text-align:center}
-.metric-val{font-size:24px;font-weight:700;color:var(--p)}
-.metric-label{font-size:10px;color:var(--gray);margin-top:4px}
+.card{background:var(--card);border-radius:10px;padding:20px;margin:15px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}
 
 /* BOTONES */
-.btn{width:100%;padding:13px;border-radius:8px;border:none;background:var(--p);color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.3s;margin-bottom:8px}
-.btn:active{transform:scale(0.98);background:var(--p2)}
-.btn-outline{background:transparent;border:2px solid var(--p);color:var(--p)}
-.btn-sm{padding:8px 16px;width:auto;font-size:12px;border-radius:6px}
-
-/* FRECUENCIAS */
-.freq-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0f0f0}
-.freq-item:last-child{border-bottom:none}
-.freq-info h4{font-size:13px;font-weight:600;color:var(--text)}
-.freq-info p{font-size:11px;color:var(--gray);margin-top:2px}
-.freq-badge{background:var(--bg);color:var(--p);padding:4px 8px;border-radius:12px;font-size:10px;font-weight:700}
-
-/* PROGRESS */
-.progress-bar{height:6px;background:#E8E0F7;border-radius:3px;overflow:hidden;margin:8px 0}
-.progress-fill{height:100%;background:linear-gradient(90deg,var(--p),#AB47BC);border-radius:3px;transition:width 1s linear}
-
-/* SISMICO */
-.sismico-display{text-align:center;padding:20px 0}
-.sismico-mag{font-size:48px;font-weight:700;color:var(--p)}
-.sismico-estado{font-size:13px;color:var(--gray);margin-top:4px}
-.wave{display:flex;align-items:flex-end;gap:3px;height:50px;justify-content:center;margin:16px 0}
-.wave-bar{width:8px;border-radius:4px 4px 0 0;background:var(--p);opacity:0.7;transition:height 0.5s ease}
-
-/* VOZ RESPONSE */
-.voz-response{background:linear-gradient(135deg,#F3E5F5,#EDE7F6);border-radius:8px;padding:14px;font-size:13px;line-height:1.6;min-height:60px;color:var(--text);font-style:italic;margin-top:10px}
-
-/* DATA ROWS */
-.data-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:13px}
-.data-row:last-child{border-bottom:none}
-.data-key{color:var(--gray)}
-.data-val{font-weight:600}
-.good{color:#4CAF50}
-.warn{color:#FF9800}
-
-/* INSTALL BANNER */
-.install-banner{background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;border-radius:12px;padding:16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
-.install-banner p{font-size:12px;opacity:0.9}
-.install-banner h3{font-size:14px;margin-bottom:4px}
+.btn{padding:10px 20px;border:none;border-radius:5px;background:var(--p);color:#fff;margin:5px}
 </style>
 </head>
 <body>
-
 <div class="header">
-  <div class="sofi-orb" onclick="toggleVoz()" id="sofiorb">🤖</div>
+  <div class="sofi-orb">🤖</div>
   <h1>SOFI</h1>
-  <p>HaaPpDigitalV · Nirvana · v2.0</p>
-  <div class="status-bar">
-    <div class="status-dot"></div>
-    <span class="status-text">Sistema activo</span>
-  </div>
-  <div class="voz-badge" id="vozBadge">🎙 Escuchando...</div>
+  <p>HaaPpDigitalV · Nirvana</p>
 </div>
 
-<nav>
-  <button class="tab active" onclick="cambiarTab('ceo',this)"><span class="tab-icon">📊</span>CEO</button>
-  <button class="tab" onclick="cambiarTab('voz',this)"><span class="tab-icon">🎙️</span>Voz</button>
-  <button class="tab" onclick="cambiarTab('perceptiva',this)"><span class="tab-icon">🧠</span>Perceptiva</button>
-  <button class="tab" onclick="cambiarTab('sismico',this)"><span class="tab-icon">🌍</span>Sísmico</button>
-  <button class="tab" onclick="cambiarTab('sistema',this)"><span class="tab-icon">⚙️</span>Sistema</button>
+<nav class="nav">
+  <button class="nav-btn active" data-tab="ceo">📊 CEO</button>
+  <button class="nav-btn" data-tab="voz">🎙️ Voz</button>
+  <button class="nav-btn" data-tab="perceptiva">🧠 Perceptiva</button>
+  <button class="nav-btn" data-tab="sismico">🌍 Sísmico</button>
+  <button class="nav-btn" data-tab="sistema">⚙️ Sistema</button>
 </nav>
 
-<div class="content">
-
-  <!-- INSTALAR BANNER -->
-  <div class="install-banner" id="installBanner" style="display:none">
-    <div>
-      <h3>📲 Instalar SOFI</h3>
-      <p>Agrega la app a tu pantalla de inicio</p>
-    </div>
-    <button class="btn btn-sm" style="background:#fff;color:var(--p);width:auto" onclick="instalarApp()">Instalar</button>
+<!-- CONTENIDO DE TODAS LAS PESTAÑAS AQUÍ -->
+<div id="ceo-tab" class="tab active">
+  <div class="card">
+    <h2>📊 DATOS HOTMART</h2>
+    <p>Ventas: <span id="ventas">0</span></p>
+    <p>Ingresos: <span id="ingresos">0</span></p>
+    <p>Productos: <span id="productos">0</span></p>
+    <button class="btn" onclick="getHotmart()">🔄 Actualizar</button>
   </div>
+</div>
 
-  <!-- CEO -->
-  <div class="panel active" id="panel-ceo">
-    <div class="card">
-      <div class="card-title">📊 Hotmart en Tiempo Real</div>
-      <div class="grid2">
-        <div class="metric"><div class="metric-val" id="totalVentas">—</div><div class="metric-label">Ventas</div></div>
-        <div class="metric"><div class="metric-val" id="totalIngreso">—</div><div class="metric-label">Ingresos</div></div>
-        <div class="metric"><div class="metric-val" id="totalProductos">—</div><div class="metric-label">Productos</div></div>
-        <div class="metric"><div class="metric-val" id="totalSaldo">—</div><div class="metric-label">Saldo</div></div>
-      </div>
-      <button class="btn" style="margin-top:14px" onclick="cargarHotmart()">⚡ Sincronizar</button>
-    </div>
-    <div class="card" id="ventasCard" style="display:none">
-      <div class="card-title">💸 Últimas Ventas</div>
-      <div id="ventasList"></div>
-    </div>
-    <div class="card">
-      <div class="card-title">🔗 Estado Conexión</div>
-      <div class="data-row"><span class="data-key">Servidor</span><span class="data-val good" id="servidorStatus">Online</span></div>
-      <div class="data-row"><span class="data-key">Hotmart API</span><span class="data-val good">Autenticado</span></div>
-      <div class="data-row"><span class="data-key">Última sync</span><span class="data-val" id="ultimaSync">—</span></div>
-    </div>
+<div id="voz-tab" class="tab">
+  <div class="card">
+    <h2>🎙️ VOZ ACTIVADA</h2>
+    <button class="btn" onclick="activarVoz()">🗣️ Activar Voz</button>
   </div>
+</div>
 
-  <!-- VOZ -->
-  <div class="panel" id="panel-voz">
-    <div class="card">
-      <div class="card-title">🎙️ Activación por Voz</div>
-      <div style="text-align:center;padding:10px 0">
-        <div class="sofi-orb" style="margin:0 auto 16px;width:100px;height:100px;font-size:44px" onclick="toggleVoz()" id="vozOrb">🎙️</div>
-        <p style="font-size:13px;color:var(--gray)" id="vozEstado">Toca para activar · Di "Sofy"</p>
-      </div>
-      <div class="voz-response" id="vozRespuesta">Hola, soy SOFI. Toca el micrófono y dime lo que necesitas.</div>
-      <div style="margin-top:12px">
-        <p style="font-size:11px;color:var(--gray);margin-bottom:8px">PALABRAS CLAVE:</p>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          <span style="background:#EDE7F6;color:var(--p);padding:4px 10px;border-radius:12px;font-size:11px">Sofy</span>
-          <span style="background:#EDE7F6;color:var(--p);padding:4px 10px;border-radius:12px;font-size:11px">ventas</span>
-          <span style="background:#EDE7F6;color:var(--p);padding:4px 10px;border-radius:12px;font-size:11px">saldo</span>
-          <span style="background:#EDE7F6;color:var(--p);padding:4px 10px;border-radius:12px;font-size:11px">meditación</span>
-          <span style="background:#EDE7F6;color:var(--p);padding:4px 10px;border-radius:12px;font-size:11px">estado</span>
-        </div>
-      </div>
-    </div>
+<div id="perceptiva-tab" class="tab">
+  <div class="card">
+    <h2>🧠 INTEGRA PERCEPTIVA</h2>
+    <button class="btn" onclick="iniciarSesion('meditacion')">🧘 Meditación</button>
+    <button class="btn" onclick="iniciarSesion('enfoque')">🎯 Enfoque</button>
+    <button class="btn" onclick="iniciarSesion('autismo')">🤝 Autismo</button>
   </div>
+</div>
 
-  <!-- PERCEPTIVA -->
-  <div class="panel" id="panel-perceptiva">
-    <div class="card">
-      <div class="card-title">🧠 Integra Perceptiva</div>
-      <div style="text-align:center;padding:8px 0 16px">
-        <div style="font-size:48px;margin-bottom:8px">🧠</div>
-        <p style="font-size:12px;color:var(--gray)" id="ipEstado">Selecciona un modo para iniciar</p>
-        <div class="progress-bar"><div class="progress-fill" id="ipProgress" style="width:0%"></div></div>
-        <p style="font-size:11px;color:var(--gray)" id="ipPct">0%</p>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">⚡ Modos de Sesión</div>
-      <div class="grid2" style="gap:8px">
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('meditacion')">🧘 Meditación</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('enfoque')">🎯 Enfoque</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('creatividad')">✨ Creatividad</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('sueno')">😴 Sueño</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('autismo')">💙 Autismo</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('tdah')">⚡ TDAH</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('esquizofrenia')">🔮 Esquizofrenia</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('ansiedad')">🌊 Ansiedad</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('depresion')">☀️ Depresión</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('sindrome_down')">🌟 S. Down</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('sordera')">👂 Sordera</button>
-        <button class="btn btn-outline btn-sm" onclick="iniciarSesion('energetico')">🌍 Energético</button>
-      </div>
-      <button class="btn" style="margin-top:12px;background:#E53935" onclick="detenerSesion()">⏹ Detener</button>
-    </div>
-    <div class="card">
-      <div class="card-title">📋 Info Sesión Activa</div>
-      <div class="data-row"><span class="data-key">Modo</span><span class="data-val" id="ipModo">—</span></div>
-      <div class="data-row"><span class="data-key">Frecuencia</span><span class="data-val" id="ipFreq">—</span></div>
-      <div class="data-row"><span class="data-key">Onda</span><span class="data-val" id="ipOnda">—</span></div>
-      <div class="data-row"><span class="data-key">Beneficio</span><span class="data-val" id="ipBeneficio" style="font-size:11px;text-align:right;max-width:60%">—</span></div>
-    </div>
+<div id="sismico-tab" class="tab">
+  <div class="card">
+    <h2>🌍 MONITOR SÍSMICO</h2>
+    <p>Magnitud: <span id="magnitud">0.0</span></p>
+    <p>Estado: <span id="estado">Normal</span></p>
+    <button class="btn" onclick="getSismico()">🔄 Actualizar</button>
   </div>
+</div>
 
-  <!-- SISMICO -->
-  <div class="panel" id="panel-sismico">
-    <div class="card">
-      <div class="card-title">🌍 Monitor Sísmico · Mérida</div>
-      <div class="sismico-display">
-        <div class="sismico-mag" id="sismoMag">0.0</div>
-        <div class="sismico-estado" id="sismoEstado">Normal</div>
-        <div class="wave" id="sismoWave">
-          <div class="wave-bar" style="height:20%"></div>
-          <div class="wave-bar" style="height:40%"></div>
-          <div class="wave-bar" style="height:60%"></div>
-          <div class="wave-bar" style="height:80%"></div>
-          <div class="wave-bar" style="height:100%"></div>
-          <div class="wave-bar" style="height:80%"></div>
-          <div class="wave-bar" style="height:60%"></div>
-          <div class="wave-bar" style="height:40%"></div>
-          <div class="wave-bar" style="height:20%"></div>
-        </div>
-      </div>
-      <div class="data-row"><span class="data-key">Frecuencia</span><span class="data-val">0.1-1 Hz</span></div>
-      <div class="data-row"><span class="data-key">Ubicación</span><span class="data-val">Mérida, Yucatán</span></div>
-      <div class="data-row"><span class="data-key">Última lectura</span><span class="data-val" id="sismoTime">—</span></div>
-      <button class="btn" style="margin-top:12px" onclick="cargarSismico()">🔄 Actualizar</button>
-    </div>
+<div id="sistema-tab" class="tab">
+  <div class="card">
+    <h2>⚙️ ESTADO DEL SISTEMA</h2>
+    <p>Versión: 2.0</p>
+    <p>Servidor: <span id="servidor">Online</span></p>
   </div>
-
-  <!-- SISTEMA -->
-  <div class="panel" id="panel-sistema">
-    <div class="card">
-      <div class="card-title">⚙️ Estado del Sistema</div>
-      <div class="data-row"><span class="data-key">SOFI CEO</span><span class="data-val good">Activo</span></div>
-      <div class="data-row"><span class="data-key">Voz</span><span class="data-val good">Activo</span></div>
-      <div class="data-row"><span class="data-key">Integra Perceptiva</span><span class="data-val good">Activo</span></div>
-      <div class="data-row"><span class="data-key">Monitor Sísmico</span><span class="data-val good">Activo</span></div>
-      <div class="data-row"><span class="data-key">Hotmart API</span><span class="data-val good">Conectado</span></div>
-      <div class="data-row"><span class="data-key">Versión</span><span class="data-val">2.0.0-HaaPpDigitalV</span></div>
-    </div>
-    <div class="card">
-      <div class="card-title">👤 Propietario</div>
-      <div class="data-row"><span class="data-key">Nombre</span><span class="data-val">Nirvana</span></div>
-      <div class="data-row"><span class="data-key">Usuario</span><span class="data-val">@estigia920833</span></div>
-      <div class="data-row"><span class="data-key">Marca</span><span class="data-val">HaaPpDigitalV</span></div>
-      <div class="data-row"><span class="data-key">TikTok</span><span class="data-val">@sofia.nirvana</span></div>
-    </div>
-    <button class="btn" onclick="verificarSistema()">🔍 Verificar Todo</button>
-  </div>
-
 </div>
 
 <script>
-const API = 'https://sofi-mcpp.onrender.com';
-const KEY = 'NirvanaSOFI2026$';
-const HEADERS = { 'x-sofi-key': KEY };
-
-let vozActiva = false;
-let recognition = null;
-let sesionInterval = null;
-let sesionProg = 0;
-let deferredPrompt = null;
-
-const frecuencias = {
-  meditacion:{hz:'4-8',onda:'Theta',beneficio:'Relajacion profunda'},
-  enfoque:{hz:'12-30',onda:'Beta',beneficio:'Concentracion alta'},
-  creatividad:{hz:'8-12',onda:'Alpha',beneficio:'Flujo creativo'},
-  sueno:{hz:'0.5-4',onda:'Delta',beneficio:'Sueno reparador'},
-  esquizofrenia:{hz:'40',onda:'Gamma',beneficio:'Sincronizacion neuronal'},
-  autismo:{hz:'10-12',onda:'Alpha',beneficio:'Reduccion ansiedad sensorial'},
-  tdah:{hz:'12-15',onda:'SMR',beneficio:'Regulacion atencion'},
-  sindrome_down:{hz:'8-10',onda:'Alpha-Theta',beneficio:'Estimulacion cognitiva'},
-  sordera:{hz:'20-40',onda:'Gamma-Beta',beneficio:'Estimulacion cortex auditivo'},
-  sensorial:{hz:'6-10',onda:'Theta-Alpha',beneficio:'Integracion sensorial'},
-  energetico:{hz:'7.83',onda:'Schumann',beneficio:'Resonancia campo magnetico'},
-  trauma:{hz:'4-8',onda:'Theta',beneficio:'Procesamiento trauma'},
-  ansiedad:{hz:'8-12',onda:'Alpha',beneficio:'Reduccion cortisol'},
-  depresion:{hz:'10',onda:'Alpha',beneficio:'Estimulacion serotonina'}
-};
-
-// NAVEGACION
-function cambiarTab(id, el) {
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('panel-' + id).classList.add('active');
-  el.classList.add('active');
-}
-
-// HOTMART
-async function cargarHotmart() {
-  document.getElementById('servidorStatus').textContent = 'Sincronizando...';
-  try {
-    const [v, p, s] = await Promise.allSettled([
-      fetch(API + '/ventas', {headers: HEADERS}).then(r => r.json()),
-      fetch(API + '/productos', {headers: HEADERS}).then(r => r.json()),
-      fetch(API + '/saldo', {headers: HEADERS}).then(r => r.json())
-    ]);
-    if (v.status === 'fulfilled') {
-      const total = v.value.page_info?.total_results || 0;
-      document.getElementById('totalVentas').textContent = total;
-      const items = v.value.items || [];
-      const ing = items.reduce((s, i) => s + (i.purchase?.price?.value || 0), 0);
-      document.getElementById('totalIngreso').textContent = ing > 0 ? '$' + ing.toFixed(0) : '$0';
-      if (items.length > 0) {
-        document.getElementById('ventasCard').style.display = 'block';
-        document.getElementById('ventasList').innerHTML = items.slice(0,5).map(i =>
-          `<div class="data-row"><span class="data-key">${i.product?.name || 'Producto'}</span><span class="data-val good">$${i.purchase?.price?.value?.toFixed(0) || '0'}</span></div>`
-        ).join('');
-      }
-    }
-    if (p.status === 'fulfilled') {
-      document.getElementById('totalProductos').textContent = p.value.page_info?.total_results || 0;
-    }
-    if (s.status === 'fulfilled') {
-      const saldo = s.value.balance?.amount || s.value.amount || 0;
-      document.getElementById('totalSaldo').textContent = saldo > 0 ? '$' + saldo.toFixed(0) : '$0';
-    }
-    document.getElementById('servidorStatus').textContent = 'Online';
-    document.getElementById('ultimaSync').textContent = new Date().toLocaleTimeString('es-MX');
-  } catch(e) {
-    document.getElementById('servidorStatus').textContent = 'Error';
-  }
-}
-
-// VOZ
-function toggleVoz() {
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    document.getElementById('vozRespuesta').textContent = 'Usa Chrome o Brave para reconocimiento de voz.';
-    return;
-  }
-  vozActiva ? detenerVoz() : iniciarVoz();
-}
-
-function iniciarVoz() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SR();
-  recognition.lang = 'es-MX';
-  recognition.continuous = false;
-  recognition.onstart = () => {
-    vozActiva = true;
-    document.getElementById('vozOrb').textContent = '🔴';
-    document.getElementById('sofiorb').textContent = '🔴';
-    document.getElementById('vozEstado').textContent = 'Escuchando...';
-    document.getElementById('vozBadge').style.display = 'inline-block';
-  };
-  recognition.onresult = e => {
-    const texto = e.results[0][0].transcript.toLowerCase();
-    procesarComando(texto);
-  };
-  recognition.onend = () => detenerVoz();
-  recognition.onerror = () => detenerVoz();
-  recognition.start();
-}
-
-function detenerVoz() {
-  vozActiva = false;
-  if (recognition) recognition.stop();
-  document.getElementById('vozOrb').textContent = '🎙️';
-  document.getElementById('sofiorb').textContent = '🤖';
-  document.getElementById('vozEstado').textContent = 'Toca para activar · Di "Sofy"';
-  document.getElementById('vozBadge').style.display = 'none';
-}
-
-function procesarComando(texto) {
-  let resp = '';
-  if (texto.includes('ventas')) { resp = 'Consultando tus ventas...'; cargarHotmart(); }
-  else if (texto.includes('saldo')) { resp = 'Revisando tu saldo...'; cargarHotmart(); }
-  else if (texto.includes('meditacion') || texto.includes('meditación')) { resp = 'Iniciando meditación...'; iniciarSesion('meditacion'); }
-  else if (texto.includes('estado')) { resp = 'Todos mis sistemas están operativos. SOFI CEO activa, Integra Perceptiva lista.'; }
-  else if (texto.includes('sofy') || texto.includes('sofi')) { resp = '¡Hola mi amor! Estoy aquí. ¿Qué necesitas? Puedo mostrarte ventas, saldo, o iniciar una sesión de Integra Perceptiva.'; }
-  else { resp = 'Escuché: "' + texto + '". Di Sofy para activarme.'; }
-  document.getElementById('vozRespuesta').textContent = resp;
-  hablar(resp);
-}
-
-function hablar(texto) {
-  if ('speechSynthesis' in window) {
-    const msg = new SpeechSynthesisUtterance(texto);
-    msg.lang = 'es-MX';
-    msg.rate = 0.95;
-    speechSynthesis.speak(msg);
-  }
-}
-
-// INTEGRA PERCEPTIVA
-function iniciarSesion(modo) {
-  if (sesionInterval) clearInterval(sesionInterval);
-  const f = frecuencias[modo] || frecuencias.meditacion;
-  document.getElementById('ipModo').textContent = modo.replace('_',' ').toUpperCase();
-  document.getElementById('ipFreq').textContent = f.hz + ' Hz';
-  document.getElementById('ipOnda').textContent = f.onda;
-  document.getElementById('ipBeneficio').textContent = f.beneficio;
-  document.getElementById('ipEstado').textContent = 'Sesión activa — ' + modo;
-  sesionProg = 0;
-  sesionInterval = setInterval(() => {
-    sesionProg = Math.min(100, sesionProg + 0.5);
-    document.getElementById('ipProgress').style.width = sesionProg + '%';
-    document.getElementById('ipPct').textContent = Math.round(sesionProg) + '%';
-    if (sesionProg >= 100) {
-      clearInterval(sesionInterval);
-      document.getElementById('ipEstado').textContent = '✅ Sesión completada';
-      hablar('Sesión de ' + modo + ' completada. Excelente.');
-    }
-  }, 1000);
-  hablar('Iniciando sesión de ' + modo);
-}
-
-function detenerSesion() {
-  if (sesionInterval) clearInterval(sesionInterval);
-  document.getElementById('ipEstado').textContent = 'Sesión detenida';
-  document.getElementById('ipProgress').style.width = '0%';
-  document.getElementById('ipPct').textContent = '0%';
-}
-
-// SISMICO
-async function cargarSismico() {
-  try {
-    const r = await fetch(API + '/perceptiva/sismico', {headers: HEADERS});
-    const d = await r.json();
-    document.getElementById('sismoMag').textContent = d.magnitud_estimada.toFixed(2);
-    document.getElementById('sismoEstado').textContent = d.estado;
-    document.getElementById('sismoTime').textContent = new Date(d.timestamp).toLocaleTimeString('es-MX');
-    animarWave(d.magnitud_estimada);
-  } catch(e) {
-    document.getElementById('sismoEstado').textContent = 'Sin conexión';
-  }
-}
-
-function animarWave(mag) {
-  const bars = document.querySelectorAll('.wave-bar');
-  bars.forEach(b => {
-    const h = Math.max(10, Math.min(100, (mag * 200) + (Math.random() * 40)));
-    b.style.height = h + '%';
+// NAVEGACIÓN ENTRE PESTAÑAS
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.style.display = 'none');
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab + '-tab').style.display = 'block';
   });
-}
+});
 
-// VERIFICAR
-async function verificarSistema() {
-  hablar('Verificando todos los sistemas');
+// FUNCIÓN DE HOTMART
+async function getHotmart() {
   try {
-    const r = await fetch(API + '/health');
-    const d = await r.json();
-    alert('✅ ' + d.status + '\n' + d.owner + '\nv' + d.version);
-  } catch(e) {
-    alert('❌ Error al conectar con el servidor');
+    const res = await fetch('https://sofi-mcpp.onrender.com/api/hotmart');
+    const data = await res.json();
+    document.getElementById('ventas').textContent = data.ventas;
+    document.getElementById('ingresos').textContent = data.ingresos;
+    document.getElementById('productos').textContent = data.productos;
+  } catch (e) {
+    console.log('Error:', e);
   }
 }
 
-// PWA INSTALL
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredPrompt = e;
-  document.getElementById('installBanner').style.display = 'flex';
-});
-
-function instalarApp() {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(() => {
-      deferredPrompt = null;
-      document.getElementById('installBanner').style.display = 'none';
-    });
+// FUNCIÓN DE SÍSMICO
+async function getSismico() {
+  try {
+    const res = await fetch('https://sofi-mcpp.onrender.com/api/sismico');
+    const data = await res.json();
+    document.getElementById('magnitud').textContent = data.magnitud;
+    document.getElementById('estado').textContent = data.estado;
+  } catch (e) {
+    console.log('Error sismico:', e);
   }
 }
 
-// ARRANCAR
-window.addEventListener('load', () => {
-  cargarHotmart();
-  cargarSismico();
-  setInterval(cargarSismico, 30000);
-});
+// FUNCIÓN DE VOZ
+function activarVoz() {
+  const synth = window.speechSynthesis;
+  const utterance = new SpeechSynthesisUtterance("¡Hola jefe! ¡Sofi lista pa' servirte arre!");
+  utterance.lang = 'es-ES';
+  synth.speak(utterance);
+}
+
+// INICIAR FUNCIONES AL CARGAR
+window.onload = () => {
+  getHotmart();
+  getSismico();
+};
 </script>
 </body>
 </html>
