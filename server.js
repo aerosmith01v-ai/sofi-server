@@ -7,7 +7,7 @@ const path = require("path");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 
-// SOFI v2.0 - VÃ­ctor Hugo GonzÃ¡lez Torres / Happs Digital
+// SOFI v2.0 - Victor Hugo Gonzalez Torres / HaaPpDigitalV 
 
 const app = express();
 const httpServer = createServer(app);
