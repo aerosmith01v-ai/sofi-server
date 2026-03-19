@@ -1,20 +1,14 @@
 {
   "name": "sofi-asistente",
   "version": "1.0.0",
-  "description": "SOFI — Motor Cognitivo Personal · Happs Digital",
+  "description": "SOFI Motor Cognitivo Personal - Happs Digital",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2"
   },
-  "author": "Víctor Hugo González Torres — Happs Digital",
-  "license": "UNLICENSED"
+  "author": "Victor Hugo Gonzalez Torres"
 }
-1
