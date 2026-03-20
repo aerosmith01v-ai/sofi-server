@@ -1,8 +1,8 @@
 /**
  * ╔══════════════════════════════════════════════════════╗
  * ║   SOFI — Motor Cognitivo Personal                   ║
- * ║   Autor: Víctor Hugo González Torres                ║
- * ║   Happs Digital — Mérida, Yucatán                  ║
+ * ║   Autor: Víctor Hugo González Torres               ║
+ * ║   HaaPpDigitalV — Mérida, Yucatán                  ║
  * ║   Deploy: Render.com                                ║
  * ╚══════════════════════════════════════════════════════╝
  */
@@ -16,30 +16,31 @@ const crypto  = require('crypto');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+// ── Constantes ────────────────────────────────────────────────
+const SOFI_API_KEY   = process.env.SOFI_API_KEY || 'sofi-dev-2026';
+const CLAUDE_MODEL   = process.env.CLAUDE_MODEL  || 'claude-haiku-4-5-20251001';
+
 // ── Middleware base ───────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 
-// ── API Key Security ──────────────────────────────────────────
-const SOFI_API_KEY = process.env.SOFI_API_KEY || 'sofi-dev-2026';
-
-// ── Rutas públicas (sin auth) ────────────────────────────────
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/health', (req, res) => {
-  const totalInter = Object.values(MEMORIA.interacciones).reduce((s,v)=>s+v.length,0);
-  res.json({ status:'online', nombre:CONFIG.nombre_ia, version:'1.0.0', timestamp:new Date().toISOString(), conocimiento:Object.keys(CONOCIMIENTO).length, notas:NOTAS.length, interacciones:totalInter });
-});
-
+// ══════════════════════════════════════════════════════════════
+// MIDDLEWARE DE SEGURIDAD — API Key
+// Todas las rutas privadas pasan por aquí
+// ══════════════════════════════════════════════════════════════
 function requireKey(req, res, next) {
   const key = req.headers['x-sofi-key'] || req.query.key;
   if (!key || key !== SOFI_API_KEY) {
-    return res.status(401).json({ error: 'Acceso denegado. Header: x-sofi-key' });
+    return res.status(401).json({
+      error: 'Acceso denegado.',
+      hint:  'Incluye el header: x-sofi-key: TU_API_KEY'
+    });
   }
   next();
 }
 
 // ══════════════════════════════════════════════════════════════
-// PERSISTENCIA JSON (equivale a los .json de mi_ia_personal.py)
+// PERSISTENCIA JSON
 // ══════════════════════════════════════════════════════════════
 const DATA = path.join(__dirname, 'data');
 if (!fs.existsSync(DATA)) fs.mkdirSync(DATA, { recursive: true });
@@ -63,7 +64,7 @@ function guardarJSON(ruta, datos) {
   catch (_) {}
 }
 
-// Estado en memoria (se recarga al iniciar)
+// Estado en memoria
 let MEMORIA      = leerJSON(RUTAS.memoria,      { interacciones: {} });
 let CONOCIMIENTO = leerJSON(RUTAS.conocimiento, {});
 let NOTAS        = leerJSON(RUTAS.notas,        []);
@@ -75,7 +76,7 @@ let CONFIG       = leerJSON(RUTAS.config, {
 });
 
 // ══════════════════════════════════════════════════════════════
-// MOTOR COGNITIVO — traducido de Python a JS
+// MOTOR COGNITIVO
 // ══════════════════════════════════════════════════════════════
 const NIVELES = { 1:'reflejo', 2:'rutina', 3:'análisis', 4:'razonamiento', 5:'profundo' };
 
@@ -110,7 +111,7 @@ function buscarEnConocimiento(pregunta) {
 }
 
 function consultarMemoria(pregunta) {
-  const patron   = extraerPatron(pregunta);
+  const patron    = extraerPatron(pregunta);
   const historial = MEMORIA.interacciones[patron] || [];
   if (!historial.length) return { ocurrencias: 0, tasa_exito: 0.5, mejor_respuesta: '' };
   const exitosas = historial.filter(h => h.exitoso).length;
@@ -123,25 +124,18 @@ function consultarMemoria(pregunta) {
 }
 
 function generarRespuesta(pregunta, nivel) {
-  const nombre   = CONFIG.nombre_ia || 'SOFI';
   const totalConoc = Object.keys(CONOCIMIENTO).length;
   const totalInter = Object.values(MEMORIA.interacciones).reduce((s, v) => s + v.length, 0);
 
   const plantillas = {
-    reflejo:       ['Entendido.', 'Recibido. ¿Qué más necesitas?', 'De acuerdo. Continúa.'],
-    rutina:        [
-      `Procesando: "${pregunta.slice(0, 60)}". Opero en modo offline. Usa /conocimiento para enseñarme la respuesta correcta.`,
-      `Consulta de rutina. Aún no tengo datos sobre esto. Enséñame con /conocimiento.`
+    reflejo:      ['Entendido.', 'Recibido. ¿Qué más necesitas?', 'De acuerdo. Continúa.'],
+    rutina:       [
+      `Procesando: "${pregunta.slice(0, 60)}". Modo offline activo. Usa /conocimiento para enseñarme.`,
+      `Consulta de rutina. Sin datos sobre esto aún. Enséñame con /conocimiento.`
     ],
-    análisis:      [
-      `Para analizar "${pregunta.slice(0, 50)}" necesito más contexto. Activa modo online o enséñame con /conocimiento.`
-    ],
-    razonamiento:  [
-      `Razonamiento complejo. Base personal: ${totalConoc} entradas. Interacciones: ${totalInter}. Activa modo online para mejor respuesta.`
-    ],
-    profundo:      [
-      `Nivel profundo. Capacidad offline activa. Conocimiento: ${totalConoc} entradas / Aprendizaje: ${totalInter} interacciones. Recomiendo modo online para este nivel.`
-    ]
+    'análisis':   [`Para analizar "${pregunta.slice(0, 50)}" necesito más contexto. Enséñame con /conocimiento.`],
+    razonamiento: [`Razonamiento complejo. Base: ${totalConoc} entradas / ${totalInter} interacciones. Activa modo online para mejor resultado.`],
+    profundo:     [`Nivel profundo. Conocimiento: ${totalConoc} entradas / ${totalInter} interacciones. Recomiendo modo online.`]
   };
 
   const nivel_nombre = NIVELES[nivel];
@@ -150,19 +144,16 @@ function generarRespuesta(pregunta, nivel) {
 }
 
 function procesarPregunta(pregunta) {
-  const nivel   = clasificarNivel(pregunta);
-  const pasado  = consultarMemoria(pregunta);
+  const nivel  = clasificarNivel(pregunta);
+  const pasado = consultarMemoria(pregunta);
 
-  // 1. Conocimiento personal
   const conocido = buscarEnConocimiento(pregunta);
   if (conocido) {
     return { respuesta: `📚 Desde tu base:\n\n${conocido}`, nivel: NIVELES[nivel], desde_memoria: false, confianza: 1.0 };
   }
-  // 2. Memoria de interacciones
   if (pasado.mejor_respuesta) {
     return { respuesta: `🧠 Basado en ${pasado.ocurrencias} interacción(es):\n\n${pasado.mejor_respuesta}`, nivel: NIVELES[nivel], desde_memoria: true, confianza: pasado.tasa_exito };
   }
-  // 3. Respuesta por nivel
   return { respuesta: generarRespuesta(pregunta, nivel), nivel: NIVELES[nivel], desde_memoria: false, confianza: 0.5 };
 }
 
@@ -191,9 +182,9 @@ async function respuestaOnline(pregunta, apiKey) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model:      'claude-haiku-4-5-20251001',
+        model:      CLAUDE_MODEL,
         max_tokens:  1024,
-        system: `Eres ${CONFIG.nombre_ia}, una IA personal creada por Víctor Hugo González Torres (Happs Digital, Mérida, Yucatán). Tu personalidad es ${CONFIG.personalidad}. Responde siempre en español. Eres directa, útil y honesta.`,
+        system: `Eres ${CONFIG.nombre_ia}, una IA personal creada por Víctor Hugo González Torres (HaaPpDigitalV, Mérida, Yucatán). Tu personalidad es ${CONFIG.personalidad}. Responde siempre en español. Eres directa, útil y honesta.`,
         messages: [{ role: 'user', content: pregunta }]
       })
     });
@@ -206,24 +197,35 @@ async function respuestaOnline(pregunta, apiKey) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// RUTAS API
+// RUTAS PÚBLICAS (sin autenticación)
 // ══════════════════════════════════════════════════════════════
 
-// — Health check
+// Página principal
+app.get('/', (req, res) => {
+  const htmlPath = path.join(__dirname, 'index.html');
+  if (fs.existsSync(htmlPath)) return res.sendFile(htmlPath);
+  res.json({ nombre: 'SOFI', estado: 'online', autor: 'HaaPpDigitalV' });
+});
+
+// Health check — público para monitoreo
 app.get('/health', (req, res) => {
   res.json({
-    status: 'online',
-    nombre: CONFIG.nombre_ia,
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-    conocimiento: Object.keys(CONOCIMIENTO).length,
-    notas: NOTAS.length,
+    status:        'online',
+    nombre:        CONFIG.nombre_ia,
+    version:       '1.0.0',
+    timestamp:     new Date().toISOString(),
+    conocimiento:  Object.keys(CONOCIMIENTO).length,
+    notas:         NOTAS.length,
     interacciones: Object.values(MEMORIA.interacciones).reduce((s, v) => s + v.length, 0)
   });
 });
 
+// ══════════════════════════════════════════════════════════════
+// RUTAS PRIVADAS (requieren x-sofi-key)
+// ══════════════════════════════════════════════════════════════
+
 // — Chat principal
-app.post('/chat', async (req, res) => {
+app.post('/chat', requireKey, async (req, res) => {
   const { pregunta } = req.body;
   if (!pregunta) return res.status(400).json({ error: 'Campo requerido: pregunta' });
 
@@ -237,7 +239,7 @@ app.post('/chat', async (req, res) => {
 });
 
 // — Feedback
-app.post('/feedback', (req, res) => {
+app.post('/feedback', requireKey, (req, res) => {
   const { pregunta, exitoso, nota } = req.body;
   if (!pregunta) return res.status(400).json({ error: 'Campo requerido: pregunta' });
   registrarFeedback(pregunta, !!exitoso, nota || '');
@@ -245,21 +247,21 @@ app.post('/feedback', (req, res) => {
 });
 
 // — Conocimiento: listar
-app.get('/conocimiento', (req, res) => {
+app.get('/conocimiento', requireKey, (req, res) => {
   res.json(CONOCIMIENTO);
 });
 
 // — Conocimiento: agregar
-app.post('/conocimiento', (req, res) => {
+app.post('/conocimiento', requireKey, (req, res) => {
   const { clave, contenido } = req.body;
-  if (!clave || !contenido) return res.status(400).json({ error: 'Campos: clave, contenido' });
+  if (!clave || !contenido) return res.status(400).json({ error: 'Campos requeridos: clave, contenido' });
   CONOCIMIENTO[clave.toLowerCase()] = { contenido, fecha: new Date().toISOString() };
   guardarJSON(RUTAS.conocimiento, CONOCIMIENTO);
   res.json({ ok: true, msg: `Aprendido: "${clave}"` });
 });
 
 // — Conocimiento: eliminar
-app.delete('/conocimiento/:clave', (req, res) => {
+app.delete('/conocimiento/:clave', requireKey, (req, res) => {
   const clave = req.params.clave.toLowerCase();
   if (!CONOCIMIENTO[clave]) return res.status(404).json({ error: 'Clave no encontrada' });
   delete CONOCIMIENTO[clave];
@@ -268,10 +270,10 @@ app.delete('/conocimiento/:clave', (req, res) => {
 });
 
 // — Notas: listar / buscar
-app.get('/notas', (req, res) => {
+app.get('/notas', requireKey, (req, res) => {
   const { q } = req.query;
   if (!q) return res.json(NOTAS);
-  const term = q.toLowerCase();
+  const term     = q.toLowerCase();
   const filtradas = NOTAS.filter(n =>
     n.titulo.toLowerCase().includes(term) ||
     n.contenido.toLowerCase().includes(term) ||
@@ -281,9 +283,9 @@ app.get('/notas', (req, res) => {
 });
 
 // — Notas: guardar
-app.post('/notas', (req, res) => {
+app.post('/notas', requireKey, (req, res) => {
   const { titulo, contenido, etiquetas } = req.body;
-  if (!titulo || !contenido) return res.status(400).json({ error: 'Campos: titulo, contenido' });
+  if (!titulo || !contenido) return res.status(400).json({ error: 'Campos requeridos: titulo, contenido' });
   const nota = { titulo, contenido, etiquetas: etiquetas || [], fecha: new Date().toISOString() };
   NOTAS.push(nota);
   guardarJSON(RUTAS.notas, NOTAS);
@@ -291,41 +293,39 @@ app.post('/notas', (req, res) => {
 });
 
 // — Config: leer
-app.get('/config', (req, res) => {
+app.get('/config', requireKey, (req, res) => {
   const { api_key, ...safe } = CONFIG;
   res.json({ ...safe, tiene_api_key: !!api_key });
 });
 
 // — Config: actualizar
-app.patch('/config', (req, res) => {
+app.patch('/config', requireKey, (req, res) => {
   const { nombre_ia, personalidad, modo_online, api_key } = req.body;
-  if (nombre_ia)    CONFIG.nombre_ia    = nombre_ia;
-  if (personalidad) CONFIG.personalidad = personalidad;
-  if (typeof modo_online === 'boolean') CONFIG.modo_online = modo_online;
-  if (api_key)      CONFIG.api_key      = api_key;
+  if (nombre_ia)                       CONFIG.nombre_ia    = nombre_ia;
+  if (personalidad)                    CONFIG.personalidad = personalidad;
+  if (typeof modo_online === 'boolean') CONFIG.modo_online  = modo_online;
+  if (api_key)                         CONFIG.api_key      = api_key;
   guardarJSON(RUTAS.config, CONFIG);
   res.json({ ok: true, config: { nombre_ia: CONFIG.nombre_ia, personalidad: CONFIG.personalidad, modo_online: CONFIG.modo_online } });
 });
 
-// — Borrar memoria aprendida
-app.delete('/memoria', (req, res) => {
+// — Borrar memoria
+app.delete('/memoria', requireKey, (req, res) => {
   MEMORIA = { interacciones: {} };
   guardarJSON(RUTAS.memoria, MEMORIA);
   res.json({ ok: true, msg: 'Memoria borrada' });
 });
-
-// root route moved above
 
 // ══════════════════════════════════════════════════════════════
 // INICIO
 // ══════════════════════════════════════════════════════════════
 app.listen(PORT, () => {
   console.log(`
-  ╔══════════════════════════════════════╗
-  ║  SOFI — Motor Cognitivo Personal    ║
-  ║  Puerto: ${PORT}                        ║
-  ║  Modo: ${CONFIG.modo_online ? 'ONLINE' : 'OFFLINE'}                     ║
-  ║  Happs Digital — Mérida, Yucatán   ║
-  ╚══════════════════════════════════════╝
+  ╔══════════════════════════════════════════╗
+  ║   SOFI — Motor Cognitivo Personal       ║
+  ║   Puerto : ${PORT}                          ║
+  ║   Modo   : ${CONFIG.modo_online ? 'ONLINE ✓' : 'OFFLINE'}                    ║
+  ║   HaaPpDigitalV — Mérida, Yucatán      ║
+  ╚══════════════════════════════════════════╝
   `);
 });
