@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOFI - Proyección Cerebral 3D</title>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script> <!-- Para gráficos 3D -->
+    <script src="/socket.io/socket.io.js"></script> <!-- Conexión con servidor -->
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { background: #0a0a1a; color: white; }
+        
+        /* Contenedor principal */
+        #contenedor-general {
+            display: flex;
+            flex-wrap: wrap;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Panel de datos del usuario */
+        #panel-usuario {
+            width: 25%;
+            background: #121224;
+            padding: 20px;
+            border-right: 2px solid #3498DB;
+        }
+
+        #panel-usuario h2 { color: #3498DB; margin-bottom: 20px; }
+        #datos-usuario p { margin: 10px 0; }
+        #actualizaciones { margin-top: 30px; }
+        .actualizacion { color: #2ECC71; margin: 5px 0; }
+
+        /* Área de proyección 3D */
+        #proyeccion-3d {
+            width: 75%;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Adaptación para móviles */
+        @media (max-width: 768px) {
+            #contenedor-general { flex-direction: column; }
+            #panel-usuario, #proyeccion-3d { width: 100%; height: 50vh; }
+        }
+    </style>
+</head>
+<body>
+    <div id="contenedor-general">
+        <!-- Panel de datos del usuario -->
+        <div id="panel-usuario">
+            <h2>🧠 DATOS DE USUARIO</h2>
+            <div id="datos-usuario">
+                <p><strong>ID:</strong> <span id="id-usuario"></span></p>
+                <p><strong>Frecuencia base:</strong> 12.3 Hz</p>
+                <p><strong>Dispositivo:</strong> <span id="dispositivo-usuario"></span></p>
+            </div>
+
+            <!-- Actualizaciones en tiempo real -->
+            <div id="actualizaciones">
+                <h3>ACTUALIZACIONES EN TIEMPO REAL</h3>
+            </div>
+        </div>
+
+        <!-- Área de proyección 3D -->
+        <div id="proyeccion-3d"></div>
+    </div>
+
+    <script>
+        // Conectar con el servidor
+        const socket = io();
+
+        // Crear escena 3D con Three.js
+        let escena, camara, renderizador;
+
+        // Inicializar escena 3D
+        function initEscena3D() {
+            // Escena
+            escena = new THREE.Scene();
+            escena.background = new THREE.Color(0x0a0a1a);
+
+            // Cámara
+            camara = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camara.position.z = 5;
+
+            // Renderizador
+            renderizador = new THREE.WebGLRenderer();
+            renderizador.setSize(window.innerWidth * 0.75, window.innerHeight);
+            document.getElementById('proyeccion-3d').appendChild(renderizador.domElement);
+
+            // Crear geometría del cerebro
+            const geometriaCerebro = new THREE.SphereGeometry(1.5, 32, 32);
+            const materialBase = new THREE.MeshBasicMaterial({ 
+                color: 0x3498DB, 
+                wireframe: true, 
+                transparent: true,
+                opacity: 0.7
+            });
+            const cerebro = new THREE.Mesh(geometriaCerebro, materialBase);
+            escena.add(cerebro);
+
+            // Zonas neuronales adicionales
+            const zonas = [
+                { color: 0xFF5733, posicion: {x: 0.5, y: 0.5, z: 0.5} },
+                { color: 0x2ECC71, posicion: {x: -0.5, y: -0.5, z: 0.5} },
+                { color: 0x9B59B6, posicion: {x: 0.5, y: -0.5, z: -0.5} }
+            ];
+
+            zonas.forEach(zona => {
+                const geoZona = new THREE.SphereGeometry(0.2, 16, 16);
+                const matZona = new THREE.MeshBasicMaterial({ color: zona.color });
+                const meshZona = new THREE.Mesh(geoZona, matZona);
+                meshZona.position.set(zona.posicion.x, zona.posicion.y, zona.posicion.z);
+                escena.add(meshZona);
+            });
+
+            // Animar escena
+            function animate() {
+                requestAnimationFrame(animate);
+                cerebro.rotation.x += 0.005;
+                cerebro.rotation.y += 0.005;
+                renderizador.render(escena, camara);
+            }
+            animate();
+        }
+
+        // Escuchar datos del servidor
+        socket.on('bienvenida', data => {
+            document.getElementById('id-usuario').textContent = data.cerebroDigital.idUsuario;
+            document.getElementById('dispositivo-usuario').textContent = data.dispositivo;
+        });
+
+        // Actualizaciones en tiempo real
+        socket.on('actualizacionTiempoReal', data => {
+            const div = document.createElement('div');
+            div.className = 'actualizacion';
+            div.textContent = `${data.tiempo}: Zona ${data.zona} activa (${data.memoria})`;
+            document.getElementById('actualizaciones').appendChild(div);
+        });
+
+        // Inicializar escena 3D al cargar
+        window.onload = () => {
+            initEscena3D();
+        };
+
+        // Ajustar tamaño al cambiar ventana
+        window.addEventListener('resize', () => {
+            camara.aspect = window.innerWidth * 0.75 / window.innerHeight;
+            camara.updateProjectionMatrix();
+            renderizador.setSize(window.innerWidth * 0.75, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
