@@ -1,11 +1,10 @@
 {
   "name": "sofi-unified",
-  "version": "5.1.0",
+  "version": "5.3.0",
   "description": "SOFI Unified - Sistema Operativo de Conciencia Digital",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node server.js"
   },
   "author": "Víctor Hugo González Torres — Mérida, Yucatán",
   "license": "MIT",
@@ -18,9 +17,6 @@
     "multer": "^1.4.5-lts.1",
     "sharp": "^0.32.6",
     "socket.io": "^4.7.2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
   },
   "engines": {
     "node": ">=16.0.0"
