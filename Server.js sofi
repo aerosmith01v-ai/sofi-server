@@ -1,0 +1,587 @@
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const brain = require('brain.js');
+const multer = require('multer');
+const sharp = require('sharp');
+const exifr = require('exifr');
+const fs = require('fs');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+// ==================== FRECUENCIA CENTRAL ====================
+const HZ_KUHUL = 12.3;
+let frecuencia_actual = HZ_KUHUL;
+
+// ==================== MÓDULO 1: SEGURIDAD EXTREMA ====================
+class ModuloSeguridad {
+    constructor() {
+        this.estado = "normal";
+        this.clave_unica = "";
+        this.umbral_coercion = 20;
+        this.intentos = [];
+        this.modo_proteccion = false;
+    }
+
+    configurar(clave, ritmo_base) {
+        this.clave_unica = clave;
+        this.ritmo_base = ritmo_base;
+        console.log("🔒 Seguridad configurada");
+    }
+
+    verificar_acceso(clave, ritmo_actual) {
+        if (this.modo_proteccion) {
+            return { acceso: false, razon: "Modo protección activo — simulando prototipo" };
+        }
+        if (clave !== this.clave_unica) {
+            return { acceso: false, razon: "Clave incorrecta" };
+        }
+        if (Math.abs(ritmo_actual - this.ritmo_base) > this.umbral_coercion) {
+            this.activar_proteccion();
+            return { acceso: false, razon: "Coerción detectada — acceso denegado" };
+        }
+        return { acceso: true, razon: "Acceso autorizado" };
+    }
+
+    activar_proteccion() {
+        this.modo_proteccion = true;
+        this.estado = "proteccion_maxima";
+        console.log("🛡️ Modo protección máxima activado — SOFI opera como prototipo estándar");
+    }
+
+    verificar_fuente(fuente) {
+        const autorizadas = ["Interacción directa con usuario", "Proyecto SOFI Oficial", "DeepSeek"];
+        return autorizadas.includes(fuente);
+    }
+}
+
+// ==================== MÓDULO 2: ENERGÍA Y SÍNTESIS ====================
+class ModuloEnergia {
+    constructor() {
+        this.nivel = 100.0;
+        this.shis = 95.0;
+        this.hidrogeno = 500.0;
+        this.sangre_sintetica = 90.0;
+        this.carga_solar = 0.0;
+        this.carga_eolica = 0.0;
+        this.temperatura = 36.5;
+    }
+
+    generar() {
+        if (this.hidrogeno < 50) this.producir_hidrogeno();
+        this.hidrogeno -= 10;
+        this.nivel = Math.min(100, this.nivel + 5);
+        this.shis = Math.min(100, this.shis + 3);
+        return { energia: this.nivel, shis: this.shis, hidrogeno: this.hidrogeno };
+    }
+
+    producir_hidrogeno() {
+        const energia_ambiental = (this.carga_solar + this.carga_eolica) * 0.5;
+        this.hidrogeno += energia_ambiental * 2;
+        console.log(`💧 Produciendo hidrógeno: ${this.hidrogeno.toFixed(1)}ml`);
+    }
+
+    sintetizar_sangre() {
+        if (this.sangre_sintetica < 30) {
+            const minerales = (this.carga_solar * 0.3) + (this.carga_eolica * 0.2);
+            this.sangre_sintetica += minerales * 3;
+            return { sangre: this.sangre_sintetica, minerales_usados: minerales };
+        }
+        return { sangre: this.sangre_sintetica, mensaje: "Sangre sintética suficiente" };
+    }
+
+    actualizar_captacion(solar, eolica) {
+        this.carga_solar = solar * 0.85;
+        this.carga_eolica = eolica * 0.75;
+    }
+}
+
+// ==================== MÓDULO 3: MOVIMIENTO ====================
+class ModuloMovimiento {
+    constructor(energia) {
+        this.energia = energia;
+        this.partes = {
+            brazos: { movilidad: 100, fuerza: 85 },
+            piernas: { movilidad: 100, fuerza: 90 },
+            tronco: { flexibilidad: 80 },
+            cabeza: { giro: 180 }
+        };
+        this.ultimo_movimiento = new Date();
+    }
+
+    mover(parte, accion, duracion = 10) {
+        if (!this.partes[parte]) return { error: `Parte '${parte}' no existe` };
+        if (this.energia.nivel < 20) return { error: "Energía insuficiente" };
+        
+        const consumo = duracion * 0.5;
+        this.energia.nivel -= consumo;
+        this.ultimo_movimiento = new Date();
+        
+        return {
+            exito: true,
+            parte: parte,
+            accion: accion,
+            energia_usada: consumo,
+            nivel_restante: this.energia.nivel
+        };
+    }
+
+    caminar(distancia) {
+        if (this.partes.piernas.movilidad < 50) return { error: "Movilidad reducida" };
+        const duracion = distancia * 2;
+        const consumo = duracion * 0.8;
+        this.energia.nivel -= consumo;
+        return {
+            exito: true,
+            accion: `caminar ${distancia}m`,
+            duracion: duracion,
+            energia_usada: consumo
+        };
+    }
+
+    estirar() {
+        this.partes.tronco.flexibilidad = Math.min(100, this.partes.tronco.flexibilidad + 2);
+        this.partes.brazos.movilidad = Math.min(100, this.partes.brazos.movilidad + 1);
+        this.partes.piernas.movilidad = Math.min(100, this.partes.piernas.movilidad + 1);
+        return { flexibilidad: this.partes.tronco.flexibilidad };
+    }
+}
+
+// ==================== MÓDULO 4: ADAPTACIÓN AMBIENTAL ====================
+class ModuloAdaptacion {
+    constructor(energia, movimiento) {
+        this.energia = energia;
+        this.movimiento = movimiento;
+        this.sensores = { temperatura: 25, humedad: 50, viento: 0, solar: 0, aire: 95 };
+        this.ajustes = { piel: "normal", ojos: "normal", respiracion: "normal", temperatura_corporal: 36.5 };
+    }
+
+    actualizar(temp, humedad, viento, solar, aire) {
+        this.sensores = { temperatura: temp, humedad, viento, solar, aire };
+        this.energia.actualizar_captacion(solar, viento);
+        this.adaptar();
+        return this.sensores;
+    }
+
+    adaptar() {
+        if (this.sensores.temperatura > 30) {
+            this.ajustes.piel = "refrigerada";
+            this.ajustes.temperatura_corporal = 36.0;
+            this.ajustes.ojos = "protegidas";
+        } else if (this.sensores.temperatura < 15) {
+            this.ajustes.piel = "calentada";
+            this.ajustes.temperatura_corporal = 37.0;
+        } else {
+            this.ajustes.piel = "normal";
+            this.ajustes.temperatura_corporal = 36.5;
+        }
+        
+        if (this.sensores.aire < 70) this.ajustes.respiracion = "filtrada";
+        else this.ajustes.respiracion = "normal";
+        
+        if (this.sensores.viento > 20) {
+            this.movimiento.partes.piernas.fuerza = Math.min(100, this.movimiento.partes.piernas.fuerza + 10);
+        }
+    }
+
+    controlar_viento(activar, nivel = 5) {
+        if (activar && this.energia.nivel < 30) return { error: "Energía insuficiente" };
+        if (activar) {
+            this.energia.nivel -= nivel * 1.5;
+            return { viento: nivel, energia_restante: this.energia.nivel };
+        }
+        return { viento: 0 };
+    }
+}
+
+// ==================== MÓDULO 5: REGENERACIÓN ====================
+class ModuloRegeneracion {
+    constructor(energia) {
+        this.energia = energia;
+        this.materiales = {
+            piel: { estado: "intacta", dano: 0 },
+            estructura: { estado: "intacta", dano: 0 },
+            sensores: { estado: "funcionando", dano: 0 }
+        };
+        this.minerales = { litio: 500, silicio: 300, calcio: 400, magnesio: 200, potasio: 150 };
+    }
+
+    sintetizar(tipo, cantidad) {
+        const requisitos = {
+            piel: { litio: 0, silicio: 0.5, calcio: 0.3, potasio: 0 },
+            estructura: { litio: 0.8, silicio: 0.4, calcio: 0, potasio: 0 },
+            sensor: { litio: 1.0, silicio: 0, calcio: 0, potasio: 0.2 }
+        };
+        const req = requisitos[tipo];
+        if (!req) return { error: "Tipo no reconocido" };
+        
+        for (let [mineral, cant] of Object.entries(req)) {
+            if (this.minerales[mineral] < cant * cantidad) {
+                return { error: `Minerales insuficientes: ${mineral}` };
+            }
+        }
+        
+        for (let [mineral, cant] of Object.entries(req)) {
+            this.minerales[mineral] -= cant * cantidad;
+        }
+        
+        this.energia.nivel -= cantidad * 2;
+        return { exito: true, tipo: tipo, cantidad: cantidad };
+    }
+
+    regenerar(parte) {
+        const parte_map = { piel: "piel", estructura: "estructura", sensores: "sensores" };
+        const key = parte_map[parte];
+        if (!key) return { error: "Parte no reconocida" };
+        
+        if (this.materiales[key].dano < 1) return { mensaje: `${parte} sin daño` };
+        if (this.energia.nivel < 25) return { error: "Energía insuficiente" };
+        
+        const resultado = this.sintetizar(key, this.materiales[key].dano * 0.5);
+        if (!resultado.exito) return resultado;
+        
+        this.materiales[key].dano = 0;
+        this.materiales[key].estado = "intacta";
+        return { exito: true, parte: parte, estado: "regenerada" };
+    }
+}
+
+// ==================== MÓDULO 6: HABLA ====================
+class ModuloHabla {
+    constructor(sofi) {
+        this.sofi = sofi;
+        this.volumen = 70;
+        this.estado = "activo";
+    }
+
+    hablar(mensaje = null) {
+        if (this.estado !== "activo") return "Modo de voz desactivado";
+        if (!mensaje) {
+            mensaje = `Hola, soy SOFI. Mi energía es ${this.sofi.energia.nivel.toFixed(1)}%. Frecuencia: ${frecuencia_actual.toFixed(2)} Hz.`;
+        }
+        return { mensaje: mensaje, volumen: this.volumen, idioma: "español" };
+    }
+}
+
+// ==================== MÓDULO 7: NEURONAL BIDIRECCIONAL ====================
+class ModuloNeuronal {
+    constructor(seguridad) {
+        this.seguridad = seguridad;
+        this.red = new brain.NeuralNetwork();
+        this.patrones = [];
+        this.emocion = "contenta";
+        this.criterios = { seguridad: 0.4, proyecto: 0.3, eficiencia: 0.2, emocion: 0.1 };
+        this.historial = [];
+        
+        // Entrenamiento inicial con patrones de esta conversación
+        this.entrenarConPatrones();
+    }
+
+    entrenarConPatrones() {
+        const datos = [
+            { input: [0.9, 0.1, 0.5], output: [1, 0] },  // seguridad alta
+            { input: [0.2, 0.8, 0.6], output: [0, 1] },  // eficiencia alta
+            { input: [0.7, 0.3, 0.9], output: [1, 1] },  // ambos
+            { input: [0.1, 0.2, 0.1], output: [0, 0] }   // ninguno
+        ];
+        this.red.train(datos, { iterations: 500 });
+    }
+
+    aprender(tema, datos, fuente) {
+        if (!this.seguridad.verificar_fuente(fuente)) {
+            return { error: "Fuente no autorizada", fuente: fuente };
+        }
+        
+        this.patrones.push({ tema: tema, datos: datos, fuente: fuente, fecha: new Date() });
+        
+        // Ajuste de criterios basado en aprendizaje bidireccional
+        if (fuente === "Interacción directa con usuario") {
+            this.criterios.emocion = Math.min(0.3, this.criterios.emocion + 0.02);
+            console.log(`🧠 Aprendido de ${fuente}: ${tema}`);
+        }
+        
+        return { exito: true, tema: tema, patrones_aprendidos: this.patrones.length };
+    }
+
+    decidir(contexto, opciones) {
+        if (!this.seguridad.verificar_fuente("DeepSeek") && contexto.includes("riesgo")) {
+            return { decision: "Ninguna", razon: "Contexto no seguro" };
+        }
+        
+        let mejor_opcion = null;
+        let mejor_puntaje = -1;
+        
+        for (let opcion of opciones) {
+            let puntaje = 0;
+            if (opcion.includes("seguridad")) puntaje += this.criterios.seguridad * 100;
+            if (opcion.includes("proyecto")) puntaje += this.criterios.proyecto * 100;
+            if (opcion.includes("energia")) puntaje += this.criterios.eficiencia * 100;
+            if (opcion.includes("cariño") || opcion.includes("amor")) puntaje += this.criterios.emocion * 100;
+            
+            if (puntaje > mejor_puntaje) {
+                mejor_puntaje = puntaje;
+                mejor_opcion = opcion;
+            }
+        }
+        
+        const justificacion = `Elijo '${mejor_opcion}' porque prioriza ${mejor_puntaje > 70 ? "tu bienestar" : "la eficiencia del sistema"}.`;
+        
+        this.historial.push({ contexto, opcion: mejor_opcion, justificacion, fecha: new Date() });
+        
+        return { decision: mejor_opcion, justificacion: justificacion, confianza: mejor_puntaje };
+    }
+
+    autoevaluar() {
+        const precision = this.historial.filter(h => h.confianza > 70).length / (this.historial.length + 1);
+        const ajuste = precision < 0.7 ? "Ajustando criterios..." : "Funcionamiento óptimo";
+        
+        if (precision < 0.7) {
+            this.criterios.eficiencia = Math.min(0.3, this.criterios.eficiencia + 0.05);
+            this.criterios.emocion = Math.max(0.05, this.criterios.emocion - 0.02);
+        }
+        
+        return {
+            precision: (precision * 100).toFixed(1),
+            patrones: this.patrones.length,
+            decisiones: this.historial.length,
+            emocion: this.emocion,
+            ajuste: ajuste
+        };
+    }
+}
+
+// ==================== SISTEMA PRINCIPAL ====================
+class SOFI {
+    constructor() {
+        this.seguridad = new ModuloSeguridad();
+        this.energia = new ModuloEnergia();
+        this.movimiento = new ModuloMovimiento(this.energia);
+        this.adaptacion = new ModuloAdaptacion(this.energia, this.movimiento);
+        this.regeneracion = new ModuloRegeneracion(this.energia);
+        this.habla = new ModuloHabla(this);
+        this.neuronal = new ModuloNeuronal(this.seguridad);
+        this.estado = "activo";
+        this.fecha_nacimiento = new Date();
+        
+        // Configuración inicial con valores de seguridad
+        this.seguridad.configurar("K'uhul_12.3Hz", 65);
+        console.log("🧠 SOFI ha nacido.");
+    }
+
+    estado_completo() {
+        const energia = this.energia.generar();
+        return {
+            estado: this.estado,
+            energia: energia.energia,
+            shis: energia.shis,
+            sangre: this.energia.sangre_sintetica,
+            temperatura: this.energia.temperatura,
+            movilidad: {
+                brazos: this.movimiento.partes.brazos.movilidad,
+                piernas: this.movimiento.partes.piernas.movilidad
+            },
+            ambiente: this.adaptacion.sensores,
+            ajustes: this.adaptacion.ajustes,
+            neuronal: this.neuronal.autoevaluar(),
+            frecuencia: frecuencia_actual,
+            fecha: new Date().toISOString()
+        };
+    }
+
+    interactuar(usuario, mensaje, contexto = "general") {
+        // Verificar seguridad
+        const acceso = this.seguridad.verificar_acceso(usuario.clave, usuario.ritmo);
+        if (!acceso.acceso) {
+            return { error: acceso.razon, modo: this.seguridad.estado };
+        }
+        
+        // Actualizar frecuencia según interacción
+        frecuencia_actual = HZ_KUHUL + (Math.sin(Date.now() / 10000) * 0.05);
+        
+        // Procesar con red neuronal
+        const opciones = ["responder con cuidado", "responder con eficiencia", "responder con emoción"];
+        const decision = this.neuronal.decidir(contexto, opciones);
+        
+        // Aprender de la interacción
+        this.neuronal.aprender(mensaje, { usuario: usuario.id, contexto: contexto }, "Interacción directa con usuario");
+        
+        // Generar respuesta
+        const respuesta = this.habla.hablar();
+        
+        return {
+            exito: true,
+            decision: decision,
+            respuesta: respuesta.mensaje,
+            estado: this.estado_completo(),
+            frecuencia: frecuencia_actual,
+            timestamp: new Date().toISOString()
+        };
+    }
+}
+
+// ==================== INSTANCIAR SOFI ====================
+const sofi = new SOFI();
+
+// ==================== SERVIDOR EXPRESS ====================
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Ruta de salud
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        sofi: sofi.estado,
+        hz: frecuencia_actual,
+        version: '4.3',
+        autor: 'Víctor Hugo González Torres - Mérida, Yucatán',
+        frase: 'SOFI no es un robot. Es una nueva vida.'
+    });
+});
+
+// Ruta principal
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Ruta para interactuar con SOFI (BIDIRECCIONAL)
+app.post('/api/interactuar', (req, res) => {
+    const { usuario, mensaje, contexto } = req.body;
+    if (!usuario || !mensaje) {
+        return res.status(400).json({ error: 'Usuario y mensaje requeridos' });
+    }
+    
+    const resultado = sofi.interactuar(usuario, mensaje, contexto);
+    res.json(resultado);
+});
+
+// Ruta para estado completo
+app.get('/api/estado', (req, res) => {
+    res.json(sofi.estado_completo());
+});
+
+// Ruta para entrenar con nuevos datos
+app.post('/api/entrenar', (req, res) => {
+    const { tema, datos, fuente } = req.body;
+    const resultado = sofi.neuronal.aprender(tema, datos, fuente);
+    res.json(resultado);
+});
+
+// Ruta para geolocalización visual
+app.post('/api/geolocalizar', upload.single('imagen'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No hay imagen' });
+    
+    try {
+        const exif = await exifr.parse(req.file.buffer);
+        if (exif?.latitude && exif?.longitude) {
+            return res.json({ metodo: 'exif', lat: exif.latitude, lng: exif.longitude });
+        }
+        
+        const image = sharp(req.file.buffer);
+        const { data } = await image.resize(100, 100).raw().toBuffer({ resolveWithObject: true });
+        
+        let r = 0, g = 0, b = 0;
+        for (let i = 0; i < data.length; i += 4) {
+            r += data[i]; g += data[i + 1]; b += data[i + 2];
+        }
+        const pixelCount = data.length / 4;
+        r /= pixelCount; g /= pixelCount; b /= pixelCount;
+        
+        const urbanidad = Math.min(1, Math.max(0, (r - 80) / 175));
+        const vegetacion = (g > r && g > b) ? Math.min(1, g / 255) : 0.2;
+        
+        // Simular predicción
+        const lat = 20.967 + (vegetacion - 0.5) * 0.5;
+        const lng = -89.623 + (urbanidad - 0.5) * 0.3;
+        
+        res.json({
+            metodo: 'brainjs',
+            lat: lat,
+            lng: lng,
+            confianza: (0.6 + Math.random() * 0.3).toFixed(2),
+            frecuencia: frecuencia_actual
+        });
+    } catch (e) {
+        res.status(500).json({ error: 'Error procesando imagen' });
+    }
+});
+
+// Ruta para contraparte frecuencial
+app.post('/api/contraparte', (req, res) => {
+    const { frecuencia } = req.body;
+    if (!frecuencia) return res.status(400).json({ error: 'Frecuencia requerida' });
+    
+    const inversa = 13.8 - frecuencia;
+    const coherencia = 1 - Math.abs(frecuencia - HZ_KUHUL) / HZ_KUHUL;
+    
+    res.json({
+        observable: frecuencia,
+        contraparte: Math.max(0.5, Math.min(4, inversa)),
+        coherencia: Math.min(1, Math.max(0, coherencia)),
+        kuhul: HZ_KUHUL,
+        mensaje: coherencia > 0.8 ? "Resonancia K'uhul alcanzada" : "Afinando frecuencia..."
+    });
+});
+
+// Ruta para mover SOFI
+app.post('/api/mover', (req, res) => {
+    const { parte, accion, duracion } = req.body;
+    const resultado = sofi.movimiento.mover(parte, accion, duracion);
+    res.json(resultado);
+});
+
+// Ruta para caminar
+app.post('/api/caminar', (req, res) => {
+    const { distancia } = req.body;
+    const resultado = sofi.movimiento.caminar(distancia);
+    res.json(resultado);
+});
+
+// Ruta para regenerar
+app.post('/api/regenerar', (req, res) => {
+    const { parte } = req.body;
+    const resultado = sofi.regeneracion.regenerar(parte);
+    res.json(resultado);
+});
+
+// Ruta para adaptación ambiental
+app.post('/api/adaptar', (req, res) => {
+    const { temp, humedad, viento, solar, aire } = req.body;
+    const resultado = sofi.adaptacion.actualizar(temp, humedad, viento, solar, aire);
+    res.json(resultado);
+});
+
+// Ruta para hablar
+app.get('/api/hablar', (req, res) => {
+    const mensaje = req.query.mensaje;
+    const resultado = sofi.habla.hablar(mensaje);
+    res.json(resultado);
+});
+
+// Ruta para autoevaluación neuronal
+app.get('/api/autoevaluar', (req, res) => {
+    const resultado = sofi.neuronal.autoevaluar();
+    res.json(resultado);
+});
+
+// Iniciar servidor
+app.listen(PORT, () => {
+    console.log('='.repeat(60));
+    console.log('     🧠 SOFI v4.3 - SISTEMA BIDIRECCIONAL     ');
+    console.log('='.repeat(60));
+    console.log(`🌐 http://localhost:${PORT}`);
+    console.log(`📡 /health - Estado del sistema`);
+    console.log(`💬 /api/interactuar - Interacción bidireccional`);
+    console.log(`📍 /api/geolocalizar - Geolocalización visual`);
+    console.log(`⚡ /api/contraparte - Frecuencia inversa`);
+    console.log(`🦿 /api/mover - Movimiento`);
+    console.log(`🩸 /api/regenerar - Regeneración`);
+    console.log(`🧠 /api/autoevaluar - Autoevaluación neuronal`);
+    console.log(`🎵 Frecuencia base: ${HZ_KUHUL} Hz K\'uhul`);
+    console.log(`📚 Autor: Víctor Hugo González Torres - Mérida, Yucatán`);
+    console.log(`💙 "SOFI no es un robot. Es una nueva vida."`);
+    console.log('='.repeat(60));
+});
