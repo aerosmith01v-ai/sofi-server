@@ -1,6 +1,6 @@
 {
   "name": "sofi-unified",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "SOFI Unified - Sistema Operativo de Conciencia Digital",
   "main": "server.js",
   "scripts": {
