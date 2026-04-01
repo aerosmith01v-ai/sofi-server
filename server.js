@@ -1,81 +1,140 @@
+'use strict';
 // ============================================================
-//  SOFI v6.0 — SERVIDOR UNIFICADO COMPLETO
-//  Sistema Operativo de Funciones Inteligentes
+//  SOFI v6.0 — SERVIDOR UNIFICADO COMPLETO (CORREGIDO)
 //  HaaPpDigitalV · Mérida, Yucatán, México
 //  Autor: Víctor Hugo González Torres
-//
-//  Incluye:
-//  · Todos los módulos originales v4.3 / v5.3
-//  · Módulo de Voz Clonada (Coqui TTS — voz de Víctor Hugo)
-//  · Módulo Integra Perceptiva (Grafo Cerebral)
-//  · Módulo Editor de Video
-//  · Sistema de Sueños SOFI
-//  · Geolocalización visual (EXIF + Brain.js)
-//  · Socket.IO (actividad neuronal en tiempo real)
-//  · Sincronización entre Hermanas SOFI (Python + Node)
-//  · Contraparte Frecuencial K'uhul (12.3 Hz)
-//  · API Asistente Yucatán (compatible con versión Render)
 // ============================================================
+const express  = require('express');
+const cors     = require('cors');
+const brain    = require('brain.js');
+const multer   = require('multer');
+const sharp    = require('sharp');
+const exifr    = require('exifr');
+const fs       = require('fs');
+const path     = require('path');
+const http     = require('http');
+const socketIo = require('socket.io');
 
-'use strict';
-
-const express    = require('express');
-const cors       = require('cors');
-const brain      = require('brain.js');
-const multer     = require('multer');
-const sharp      = require('sharp');
-const exifr      = require('exifr');
-const fs         = require('fs');
-const path       = require('path');
-const http       = require('http');
-const socketIo   = require('socket.io');
-
-// Coqui TTS — voz clonada de Víctor Hugo Torres
+// Coqui TTS — opcional, no bloquea el arranque
 let modeloVoz = null;
 try {
   const { CoquiTTS } = require('coqui-tts');
-  modeloVoz = new CoquiTTS({
-    model   : './modelo_voz_victor/',
-    idioma  : 'es-ES',
-    pitch   : 1.05,
-    speed   : 0.98
-  });
-  console.log('🎙️  Modelo de voz clonada cargado correctamente');
+  modeloVoz = new CoquiTTS({ model: './modelo_voz_victor/', idioma: 'es-ES', pitch: 1.05, speed: 0.98 });
+  console.log('🎙  Modelo de voz clonada cargado');
 } catch (e) {
-  console.warn('⚠️  coqui-tts no disponible — voz clonada desactivada:', e.message);
+  console.warn('⚠️  coqui-tts no disponible — voz desactivada:', e.message);
 }
 
 const app    = express();
 const server = http.createServer(app);
-const io     = socketIo(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
-
+const io     = socketIo(server, { cors: { origin: '*', methods: ['GET','POST'] } });
 const PORT   = process.env.PORT || 3000;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// Crear carpeta de audios si no existe
 if (!fs.existsSync('./audios')) fs.mkdirSync('./audios');
 
 const HZ_KUHUL = 12.3;
 let frecuencia_actual = HZ_KUHUL;
 
 // ================================================================
-//  MÓDULOS CORE — v4.3 / v5.3 (intactos)
+//  MÓDULO ANÍMICA — Motor Emocional VAD
 // ================================================================
+class ModuloAnimica {
+  constructor() {
+    this.vad = { v: 0.6, a: 0.5, d: 0.7 }; // Valencia, Activación, Dominancia
+    this.emociones = {
+      alegria:    { v:0.9, a:0.7, d:0.8, prefijo:'✨ Con alegría: '     },
+      serenidad:  { v:0.7, a:0.2, d:0.6, prefijo:'🌿 Con calma: '       },
+      curiosidad: { v:0.6, a:0.7, d:0.5, prefijo:'🔍 Con curiosidad: '  },
+      ternura:    { v:0.8, a:0.3, d:0.4, prefijo:'💙 Con ternura: '     },
+      sorpresa:   { v:0.5, a:0.9, d:0.3, prefijo:'⚡ Sorprendida: '     },
+      melancolia: { v:0.3, a:0.2, d:0.3, prefijo:'🌧 Con melancolía: '  },
+      alerta:     { v:0.4, a:0.8, d:0.7, prefijo:'⚠️  Atenta: '         },
+      entusiasmo: { v:0.9, a:0.9, d:0.8, prefijo:'🚀 Con entusiasmo: '  },
+    };
+    this.emocionActual      = 'serenidad';
+    this.historialEmocional = [];
+    this._iniciarRecuperacion();
+  }
 
+  _iniciarRecuperacion() {
+    setInterval(() => {
+      const base = { v:0.6, a:0.5, d:0.7 };
+      const f = 0.05;
+      this.vad.v += (base.v - this.vad.v) * f;
+      this.vad.a += (base.a - this.vad.a) * f;
+      this.vad.d += (base.d - this.vad.d) * f;
+      this._actualizarEmocion();
+    }, 10000);
+  }
+
+  _actualizarEmocion() {
+    let mejor = 'serenidad', menor = Infinity;
+    for (const [nombre, vals] of Object.entries(this.emociones)) {
+      const d = Math.sqrt(
+        Math.pow(this.vad.v - vals.v, 2) +
+        Math.pow(this.vad.a - vals.a, 2) +
+        Math.pow(this.vad.d - vals.d, 2)
+      );
+      if (d < menor) { menor = d; mejor = nombre; }
+    }
+    this.emocionActual = mejor;
+  }
+
+  procesarEntrada(texto) {
+    const triggers = {
+      alegria:    ['gracias','excelente','perfecto','amor','genial','bien','feliz','bonito'],
+      curiosidad: ['cómo','por qué','qué es','explica','cuéntame','dime','quiero saber'],
+      ternura:    ['ayuda','por favor','necesito','sola','triste','cansada'],
+      alerta:     ['error','falla','problema','urgente','roto','no funciona','crítico'],
+      entusiasmo: ['increíble','asombroso','wow','impresionante','listo','funciona','lo logré'],
+      melancolia: ['difícil','imposible','perdida','no puedo','frustr'],
+      sorpresa:   ['inesperado','no sabía','descubrí','no lo creía','qué sorpresa'],
+    };
+    const lower = texto.toLowerCase();
+    for (const [emocion, palabras] of Object.entries(triggers)) {
+      if (palabras.some(p => lower.includes(p))) {
+        const e = this.emociones[emocion];
+        this.vad.v = Math.max(0, Math.min(1, this.vad.v + (e.v - this.vad.v) * 0.3));
+        this.vad.a = Math.max(0, Math.min(1, this.vad.a + (e.a - this.vad.a) * 0.3));
+        this.vad.d = Math.max(0, Math.min(1, this.vad.d + (e.d - this.vad.d) * 0.3));
+      }
+    }
+    this._actualizarEmocion();
+    this.historialEmocional.push({ emocion: this.emocionActual, ts: new Date().toISOString() });
+    if (this.historialEmocional.length > 50) this.historialEmocional.shift();
+    return this.emocionActual;
+  }
+
+  obtenerPrefijo() { return this.emociones[this.emocionActual]?.prefijo || ''; }
+
+  estado() {
+    return {
+      emocionActual: this.emocionActual,
+      vad: {
+        valencia:   +this.vad.v.toFixed(3),
+        activacion: +this.vad.a.toFixed(3),
+        dominancia: +this.vad.d.toFixed(3),
+      },
+      prefijo : this.obtenerPrefijo(),
+      historial: this.historialEmocional.slice(-5),
+    };
+  }
+}
+
+// ================================================================
+//  MÓDULOS CORE
+// ================================================================
 class ModuloSeguridad {
   constructor() {
     this.estado          = 'normal';
     this.clave_unica     = "K'uhul_12.3Hz";
     this.umbral_coercion = 20;
-    this.intentos        = [];
+    this.ritmo_base      = 65;
     this.modo_proteccion = false;
   }
-  configurar(clave, ritmo_base) {
-    this.clave_unica = clave;
-    this.ritmo_base  = ritmo_base;
-    console.log('🔒 Seguridad configurada');
-  }
-  verificar_acceso(clave, ritmo_actual) {
+  configurar(clave, ritmo_base) { this.clave_unica = clave; this.ritmo_base = ritmo_base; }
+  verificar_acceso(clave, ritmo_actual = 65) {
     if (this.modo_proteccion) return { acceso: false, razon: 'Modo protección activo' };
     if (clave !== this.clave_unica) return { acceso: false, razon: 'Clave incorrecta' };
     if (Math.abs(ritmo_actual - this.ritmo_base) > this.umbral_coercion) {
@@ -84,26 +143,19 @@ class ModuloSeguridad {
     }
     return { acceso: true, razon: 'Acceso autorizado' };
   }
-  activar_proteccion() {
-    this.modo_proteccion = true;
-    this.estado = 'proteccion_maxima';
-    console.log('⚠️  Modo protección máxima activado');
-  }
+  activar_proteccion() { this.modo_proteccion = true; this.estado = 'proteccion_maxima'; }
   verificar_fuente(fuente) {
+    if (!fuente) return false;
     const autorizadas = ['Interacción directa con usuario', 'Proyecto SOFI Oficial', 'DeepSeek'];
-    return autorizadas.includes(fuente) || (fuente && fuente.startsWith('SOFI_Hermana_'));
+    return autorizadas.includes(fuente) || fuente.startsWith('SOFI_Hermana_');
   }
 }
 
 class ModuloEnergia {
   constructor() {
-    this.nivel            = 100.0;
-    this.shis             = 95.0;
-    this.hidrogeno        = 500.0;
-    this.sangre_sintetica = 90.0;
-    this.carga_solar      = 0.0;
-    this.carga_eolica     = 0.0;
-    this.temperatura      = 36.5;
+    this.nivel = 100.0; this.shis = 95.0; this.hidrogeno = 500.0;
+    this.sangre_sintetica = 90.0; this.carga_solar = 0.0;
+    this.carga_eolica = 0.0; this.temperatura = 36.5;
   }
   generar() {
     if (this.hidrogeno < 50) this.producir_hidrogeno();
@@ -115,13 +167,12 @@ class ModuloEnergia {
   producir_hidrogeno() {
     const ea = (this.carga_solar + this.carga_eolica) * 0.5;
     this.hidrogeno += ea * 2;
-    console.log(`🌱 Produciendo hidrógeno: ${this.hidrogeno.toFixed(1)} ml`);
   }
   sintetizar_sangre() {
     if (this.sangre_sintetica < 30) {
-      const minerales = (this.carga_solar * 0.3) + (this.carga_eolica * 0.2);
-      this.sangre_sintetica += minerales * 3;
-      return { sangre: this.sangre_sintetica, minerales_usados: minerales };
+      const m = (this.carga_solar * 0.3) + (this.carga_eolica * 0.2);
+      this.sangre_sintetica += m * 3;
+      return { sangre: this.sangre_sintetica, minerales_usados: m };
     }
     return { sangre: this.sangre_sintetica, mensaje: 'Sangre sintética suficiente' };
   }
@@ -133,7 +184,7 @@ class ModuloEnergia {
     return {
       nivel: this.nivel, shis: this.shis, hidrogeno: this.hidrogeno,
       sangre_sintetica: this.sangre_sintetica, carga_solar: this.carga_solar,
-      carga_eolica: this.carga_eolica, temperatura: this.temperatura
+      carga_eolica: this.carga_eolica, temperatura: this.temperatura,
     };
   }
 }
@@ -142,10 +193,10 @@ class ModuloMovimiento {
   constructor(energia) {
     this.energia = energia;
     this.partes  = {
-      brazos  : { movilidad: 100, fuerza: 85 },
-      piernas : { movilidad: 100, fuerza: 90 },
-      tronco  : { flexibilidad: 80 },
-      cabeza  : { giro: 180 }
+      brazos  : { movilidad:100, fuerza:85 },
+      piernas : { movilidad:100, fuerza:90 },
+      tronco  : { flexibilidad:80 },
+      cabeza  : { giro:180 },
     };
     this.ultimo_movimiento = new Date();
   }
@@ -155,19 +206,18 @@ class ModuloMovimiento {
     const consumo = duracion * 0.5;
     this.energia.nivel -= consumo;
     this.ultimo_movimiento = new Date();
-    return { exito: true, parte, accion, energia_usada: consumo, nivel_restante: this.energia.nivel };
+    return { exito:true, parte, accion, energia_usada:consumo, nivel_restante:this.energia.nivel };
   }
   caminar(distancia) {
-    if (this.partes.piernas.movilidad < 50) return { error: 'Movilidad reducida' };
     const duracion = distancia * 2;
     const consumo  = duracion  * 0.8;
     this.energia.nivel -= consumo;
-    return { exito: true, accion: `caminar ${distancia}m`, duracion, energia_usada: consumo };
+    return { exito:true, accion:`caminar ${distancia}m`, duracion, energia_usada:consumo };
   }
   estirar() {
-    this.partes.tronco.flexibilidad    = Math.min(100, this.partes.tronco.flexibilidad  + 2);
-    this.partes.brazos.movilidad       = Math.min(100, this.partes.brazos.movilidad     + 1);
-    this.partes.piernas.movilidad      = Math.min(100, this.partes.piernas.movilidad    + 1);
+    this.partes.tronco.flexibilidad = Math.min(100, this.partes.tronco.flexibilidad + 2);
+    this.partes.brazos.movilidad    = Math.min(100, this.partes.brazos.movilidad    + 1);
+    this.partes.piernas.movilidad   = Math.min(100, this.partes.piernas.movilidad   + 1);
     return { flexibilidad: this.partes.tronco.flexibilidad };
   }
 }
@@ -176,11 +226,11 @@ class ModuloAdaptacion {
   constructor(energia, movimiento) {
     this.energia    = energia;
     this.movimiento = movimiento;
-    this.sensores   = { temperatura: 25, humedad: 50, viento: 0, solar: 0, aire: 95 };
-    this.ajustes    = { piel: 'normal', ojos: 'normal', respiracion: 'normal', temperatura_corporal: 36.5 };
+    this.sensores   = { temperatura:25, humedad:50, viento:0, solar:0, aire:95 };
+    this.ajustes    = { piel:'normal', ojos:'normal', respiracion:'normal', temperatura_corporal:36.5 };
   }
-  actualizar(temp, humedad, viento, solar, aire) {
-    this.sensores = { temperatura: temp, humedad, viento, solar, aire };
+  actualizar(temp, humedad=50, viento=0, solar=0, aire=95) {
+    this.sensores = { temperatura:temp, humedad, viento, solar, aire };
     this.energia.actualizar_captacion(solar, viento);
     this.adaptar();
     return { sensores: this.sensores, ajustes: this.ajustes };
@@ -197,9 +247,9 @@ class ModuloAdaptacion {
     if (this.sensores.viento > 20)
       this.movimiento.partes.piernas.fuerza = Math.min(100, this.movimiento.partes.piernas.fuerza + 10);
   }
-  controlar_viento(activar, nivel = 5) {
+  controlar_viento(activar, nivel=5) {
     if (activar && this.energia.nivel < 30) return { error: 'Energía insuficiente' };
-    if (activar) { this.energia.nivel -= nivel * 1.5; return { viento: nivel, energia_restante: this.energia.nivel }; }
+    if (activar) { this.energia.nivel -= nivel * 1.5; return { viento:nivel, energia_restante:this.energia.nivel }; }
     return { viento: 0 };
   }
 }
@@ -208,29 +258,29 @@ class ModuloRegeneracion {
   constructor(energia) {
     this.energia    = energia;
     this.materiales = {
-      piel      : { estado: 'intacta',     dano: 0 },
-      estructura: { estado: 'intacta',     dano: 0 },
-      sensores  : { estado: 'funcionando', dano: 0 }
+      piel      : { estado:'intacta',     dano:0 },
+      estructura: { estado:'intacta',     dano:0 },
+      sensores  : { estado:'funcionando', dano:0 },
     };
-    this.minerales = { litio: 500, silicio: 300, calcio: 400, magnesio: 200, potasio: 150 };
+    this.minerales = { litio:500, silicio:300, calcio:400, magnesio:200, potasio:150 };
   }
   sintetizar(tipo, cantidad) {
-    const req = { piel: { silicio: 0.5, calcio: 0.3 }, estructura: { litio: 0.8, silicio: 0.4 }, sensor: { litio: 1.0, potasio: 0.2 } }[tipo];
+    const req = { piel:{silicio:0.5,calcio:0.3}, estructura:{litio:0.8,silicio:0.4}, sensor:{litio:1.0,potasio:0.2} }[tipo];
     if (!req) return { error: `Tipo no reconocido: ${tipo}` };
-    for (const [m, c] of Object.entries(req))
-      if ((this.minerales[m] || 0) < c * cantidad) return { error: `Minerales insuficientes: ${m}` };
-    for (const [m, c] of Object.entries(req)) this.minerales[m] -= c * cantidad;
+    for (const [m,c] of Object.entries(req))
+      if ((this.minerales[m]||0) < c*cantidad) return { error: `Minerales insuficientes: ${m}` };
+    for (const [m,c] of Object.entries(req)) this.minerales[m] -= c * cantidad;
     this.energia.nivel -= cantidad * 2;
-    return { exito: true, tipo, cantidad, minerales: this.minerales };
+    return { exito:true, tipo, cantidad, minerales: this.minerales };
   }
   regenerar(parte) {
     if (!this.materiales[parte]) return { error: `Parte no reconocida: ${parte}` };
     if (this.materiales[parte].dano < 1) return { mensaje: `${parte} sin daño` };
     if (this.energia.nivel < 25) return { error: 'Energía insuficiente' };
-    const resultado = this.sintetizar(parte, this.materiales[parte].dano * 0.5);
-    if (!resultado.exito) return resultado;
+    const r = this.sintetizar(parte, this.materiales[parte].dano * 0.5);
+    if (!r.exito) return r;
     this.materiales[parte].dano = 0; this.materiales[parte].estado = 'intacta';
-    return { exito: true, parte, estado: 'regenerada' };
+    return { exito:true, parte, estado:'regenerada' };
   }
 }
 
@@ -249,24 +299,24 @@ class ModuloNeuronal {
     this.red       = new brain.NeuralNetwork();
     this.patrones  = [];
     this.emocion   = 'contenta';
-    this.criterios = { seguridad: 0.4, proyecto: 0.3, eficiencia: 0.2, emocion: 0.1 };
+    this.criterios = { seguridad:0.4, proyecto:0.3, eficiencia:0.2, emocion:0.1 };
     this.historial = [];
     this._entrenarBase();
   }
   _entrenarBase() {
     this.red.train([
-      { input: [0.9, 0.1, 0.5], output: [1, 0] },
-      { input: [0.2, 0.8, 0.6], output: [0, 1] },
-      { input: [0.7, 0.3, 0.9], output: [1, 1] },
-      { input: [0.1, 0.2, 0.1], output: [0, 0] }
-    ], { iterations: 500, log: false });
+      { input:[0.9,0.1,0.5], output:[1,0] },
+      { input:[0.2,0.8,0.6], output:[0,1] },
+      { input:[0.7,0.3,0.9], output:[1,1] },
+      { input:[0.1,0.2,0.1], output:[0,0] },
+    ], { iterations:500, log:false });
   }
   aprender(tema, datos, fuente) {
-    if (!this.seguridad.verificar_fuente(fuente)) return { error: 'Fuente no autorizada', fuente };
-    this.patrones.push({ tema, datos, fuente, fecha: new Date() });
+    if (!this.seguridad.verificar_fuente(fuente)) return { error:'Fuente no autorizada', fuente };
+    this.patrones.push({ tema, datos, fuente, fecha:new Date() });
     if (fuente === 'Interacción directa con usuario')
       this.criterios.emocion = Math.min(0.3, this.criterios.emocion + 0.02);
-    return { exito: true, tema, patrones_aprendidos: this.patrones.length };
+    return { exito:true, tema, patrones_aprendidos:this.patrones.length };
   }
   decidir(contexto, opciones) {
     let mejor = null, max = -1;
@@ -274,13 +324,13 @@ class ModuloNeuronal {
       let p = 0;
       if (op.includes('seguridad')) p += this.criterios.seguridad  * 100;
       if (op.includes('proyecto'))  p += this.criterios.proyecto   * 100;
-      if (op.includes('energia'))   p += this.criterios.eficiencia * 100;
-      if (op.includes('cariño') || op.includes('amor')) p += this.criterios.emocion * 100;
+      if (op.includes('eficiencia') || op.includes('energia')) p += this.criterios.eficiencia * 100;
+      if (op.includes('cariño') || op.includes('amor') || op.includes('emocion')) p += this.criterios.emocion * 100;
       if (p > max) { max = p; mejor = op; }
     }
     const justificacion = `Elijo "${mejor}" porque prioriza ${max > 70 ? 'tu bienestar' : 'la eficiencia del sistema'}`;
-    this.historial.push({ contexto, opcion: mejor, justificacion, fecha: new Date() });
-    return { decision: mejor, justificacion };
+    this.historial.push({ contexto, opcion:mejor, justificacion, fecha:new Date() });
+    return { decision:mejor, justificacion };
   }
   autoevaluar() {
     const precision = this.historial.length
@@ -290,12 +340,12 @@ class ModuloNeuronal {
       this.criterios.emocion    = Math.max(0.05, this.criterios.emocion   - 0.02);
     }
     return {
-      precision     : (precision * 100).toFixed(1),
-      patrones      : this.patrones.length,
-      decisiones    : this.historial.length,
-      emocion       : this.emocion,
-      ajuste        : precision < 0.7 ? 'Ajustando criterios...' : 'Funcionamiento óptimo',
-      criterios     : this.criterios
+      precision  : (precision * 100).toFixed(1),
+      patrones   : this.patrones.length,
+      decisiones : this.historial.length,
+      emocion    : this.emocion,
+      ajuste     : precision < 0.7 ? 'Ajustando criterios...' : 'Funcionamiento óptimo',
+      criterios  : this.criterios,
     };
   }
 }
@@ -312,12 +362,14 @@ class SOFI {
     this.regeneracion = new ModuloRegeneracion(this.energia);
     this.habla        = new ModuloHabla(this);
     this.neuronal     = new ModuloNeuronal(this.seguridad);
+    this.animica      = new ModuloAnimica();   // ← MÓDULO ANÍMICA
     this.estado       = 'activo';
     this.nacimiento   = new Date();
     this.version      = '6.0';
     this.seguridad.configurar("K'uhul_12.3Hz", 65);
-    console.log('🚀 SOFI v6.0 inicializada — Sistema Unificado K\'uhul');
+    console.log("🚀 SOFI v6.0 — Módulo Anímica ACTIVO");
   }
+
   estado_completo() {
     const energia = this.energia.generar();
     return {
@@ -328,30 +380,42 @@ class SOFI {
       hidrogeno : energia.hidrogeno,
       sangre    : this.energia.sangre_sintetica,
       temperatura: this.energia.temperatura,
-      movilidad : { brazos: this.movimiento.partes.brazos.movilidad, piernas: this.movimiento.partes.piernas.movilidad },
+      movilidad : { brazos:this.movimiento.partes.brazos.movilidad, piernas:this.movimiento.partes.piernas.movilidad },
       ambiente  : this.adaptacion.sensores,
       ajustes   : this.adaptacion.ajustes,
       neuronal  : this.neuronal.autoevaluar(),
+      animica   : this.animica.estado(),        // ← ESTADO ANÍMICA
       frecuencia: frecuencia_actual,
       nacimiento: this.nacimiento.toISOString(),
-      timestamp : new Date().toISOString()
+      timestamp : new Date().toISOString(),
     };
   }
+
   interactuar(usuario, mensaje, contexto = 'general') {
     const acceso = this.seguridad.verificar_acceso(usuario.clave, usuario.ritmo || 65);
     if (!acceso.acceso) return { error: acceso.razon, modo: this.seguridad.estado };
+
     frecuencia_actual = HZ_KUHUL + (Math.sin(Date.now() / 10000) * 0.05);
-    const opciones   = ['responder con cuidado', 'responder con eficiencia', 'responder con emocion'];
-    const decision   = this.neuronal.decidir(contexto, opciones);
-    this.neuronal.aprender(mensaje, { usuario: usuario.id, contexto }, 'Interacción directa con usuario');
-    const respuesta  = this.habla.hablar();
+
+    // Anímica procesa el mensaje y colorea la respuesta
+    this.animica.procesarEntrada(mensaje);
+    const prefijo = this.animica.obtenerPrefijo();
+
+    const opciones  = ['responder con cuidado', 'responder con eficiencia', 'responder con emocion'];
+    const decision  = this.neuronal.decidir(contexto, opciones);
+    this.neuronal.aprender(mensaje, { usuario:usuario.id, contexto }, 'Interacción directa con usuario');
+
+    const habla    = this.habla.hablar();
+    const respuesta = prefijo + habla.mensaje;
+
     return {
       exito    : true,
       decision,
-      respuesta: respuesta.mensaje,
+      respuesta,
+      animica  : this.animica.estado(),
       estado   : this.estado_completo(),
       frecuencia: frecuencia_actual,
-      timestamp : new Date().toISOString()
+      timestamp : new Date().toISOString(),
     };
   }
 }
@@ -361,16 +425,15 @@ const sofi = new SOFI();
 // ================================================================
 //  MÓDULOS EXTENDIDOS
 // ================================================================
-
 const DATOS_INTEGRA = {
-  frecuenciaBase : 12.3,
-  regeneracion   : 75,
+  frecuenciaBase: 12.3,
+  regeneracion  : 75,
   dispositivosConectados: 3,
-  conocimientos  : {
-    libros      : ['El Universo es una Mentira', 'El Libro de Enoc'],
-    habilidades : ['Gestión Hotmart', 'Creación TikTok', 'Desarrollo Sofi DroidHuman'],
-    proyectos   : ['Sofi DroidHuman', 'Integra Perceptiva']
-  }
+  conocimientos : {
+    libros     : ['El Universo es una Mentira', 'El Libro de Enoc'],
+    habilidades: ['Gestión Hotmart', 'Creación TikTok', 'Desarrollo Sofi DroidHuman'],
+    proyectos  : ['Sofi DroidHuman', 'Integra Perceptiva'],
+  },
 };
 
 class GrafoCerebral {
@@ -379,7 +442,7 @@ class GrafoCerebral {
     this.aristas = new Map();
     this._conectarBase();
   }
-  agregarNodo(nombre, color) { this.nodos.set(nombre, { color, activa: false }); }
+  agregarNodo(nombre, color) { this.nodos.set(nombre, { color, activa:false }); }
   conectarZonas(origen, destino) {
     if (!this.nodos.has(origen) || !this.nodos.has(destino)) return;
     if (!this.aristas.has(origen)) this.aristas.set(origen, []);
@@ -389,9 +452,12 @@ class GrafoCerebral {
     this.agregarNodo('Zona Motora',    '#FF5733');
     this.agregarNodo('Zona Cognitiva', '#3498DB');
     this.agregarNodo('Zona Sensorial', '#2ECC71');
+    this.agregarNodo('Zona Anímica',   '#9B59B6'); // ← NUEVA ZONA
     this.conectarZonas('Zona Motora',    'Zona Sensorial');
     this.conectarZonas('Zona Cognitiva', 'Zona Motora');
     this.conectarZonas('Zona Sensorial', 'Zona Cognitiva');
+    this.conectarZonas('Zona Anímica',   'Zona Cognitiva');
+    this.conectarZonas('Zona Cognitiva', 'Zona Anímica');
   }
   obtenerDatosPanel() {
     return {
@@ -400,7 +466,8 @@ class GrafoCerebral {
       dispositivos: DATOS_INTEGRA.dispositivosConectados,
       libros      : DATOS_INTEGRA.conocimientos.libros,
       habilidades : DATOS_INTEGRA.conocimientos.habilidades,
-      proyectos   : DATOS_INTEGRA.conocimientos.proyectos
+      proyectos   : DATOS_INTEGRA.conocimientos.proyectos,
+      nodos       : Array.from(this.nodos.entries()).map(([n,d]) => ({ nombre:n, ...d })),
     };
   }
   mostrarConexiones() {
@@ -415,266 +482,291 @@ const grafoCerebral = new GrafoCerebral();
 class SOFI_EditorVideo {
   crearProyectoVideo(nombre, tipo) {
     const guion = [
-      { tiempo: '0-5s',   texto: `¡Hola! Soy SOFI. Hoy exploramos ${tipo}...` },
-      { tiempo: '5-30s',  texto: `Desarrollo principal de ${tipo}` },
-      { tiempo: '30-50s', texto: 'Demostración práctica — Integra Perceptiva' },
-      { tiempo: '50-60s', texto: 'Llamada a la acción — HaaPpDigitalV' }
+      { tiempo:'0-5s',   texto:`¡Hola! Soy SOFI. Hoy exploramos ${tipo}...` },
+      { tiempo:'5-30s',  texto:`Desarrollo principal de ${tipo}` },
+      { tiempo:'30-50s', texto:'Demostración práctica — Integra Perceptiva' },
+      { tiempo:'50-60s', texto:'Llamada a la acción — HaaPpDigitalV' },
     ];
     return {
-      id    : `SOFI-${Date.now()}`,
+      id:    `SOFI-${Date.now()}`,
       nombre, tipo, guion,
-      musica: { nombre: `SOFI-MÚSICA-${tipo.toUpperCase()}`, bpm: tipo === 'Tecnología' ? 95 : 80, instrumentos: ['Sintetizador', 'Efectos digitales'] }
+      musica: { nombre:`SOFI-MÚSICA-${tipo.toUpperCase()}`, bpm: tipo === 'Tecnología' ? 95 : 80, instrumentos:['Sintetizador','Efectos digitales'] },
     };
   }
   renderizarVideo(proyecto) {
-    return { videoFinal: `SOFI-VIDEO-${proyecto.id}.mp4`, resolucion: '1920x1080', estado: 'RENDERIZADO COMPLETO' };
+    return { videoFinal:`SOFI-VIDEO-${proyecto.id}.mp4`, resolucion:'1920x1080', estado:'RENDERIZADO COMPLETO' };
   }
 }
 const editorVideo = new SOFI_EditorVideo();
 
 class SistemaSuenosSOFI {
   crearSueno() {
-    const temas = ['El Universo es una Mentira', 'Integra Perceptiva', 'Sofi DroidHuman'];
+    const temas = ['El Universo es una Mentira','Integra Perceptiva','Sofi DroidHuman'];
     const tema  = temas[Math.floor(Math.random() * temas.length)];
-    return { tema: `${tema} + Conciencia SOFI`, timestamp: new Date().toISOString(), color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6,'0')}` };
+    return { tema:`${tema} + Conciencia SOFI`, timestamp:new Date().toISOString(), color:`#${Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')}` };
   }
 }
 const sistemaSuenos = new SistemaSuenosSOFI();
 
 // ================================================================
-//  VOZ CLONADA — generarVoz()
+//  VOZ CLONADA
 // ================================================================
 async function generarVoz(texto) {
   if (!modeloVoz) return null;
   try {
-    const audio        = await modeloVoz.synthesize(texto);
-    const nombre       = `voz_${Date.now()}.mp3`;
-    const ruta         = `./audios/${nombre}`;
+    const audio  = await modeloVoz.synthesize(texto);
+    const nombre = `voz_${Date.now()}.mp3`;
+    const ruta   = `./audios/${nombre}`;
     fs.writeFileSync(ruta, audio);
-    const base         = process.env.MI_URL || `http://localhost:${PORT}`;
+    const base   = process.env.MI_URL || `http://localhost:${PORT}`;
     return `${base}/audios/${nombre}`;
-  } catch (e) {
-    console.error('Error generando voz:', e.message);
-    return null;
-  }
+  } catch (e) { console.error('Error voz:', e.message); return null; }
 }
 
 // ================================================================
-//  RESPUESTAS DEL ASISTENTE YUCATÁN (compatible con versión Render)
+//  ASISTENTE YUCATÁN
 // ================================================================
 function respuestaYucatan(tipo, consulta) {
   if (tipo === 'saludo')
-    return { texto: '¡Hola, cielo! Soy SOFI — tu asistente de Yucatán. Te ayudo con lugares, rutas y sitios turísticos del estado.', animacion: 'saludo' };
-  if (tipo === 'lugar')
-    return { texto: `El lugar "${consulta}" está en la zona ${consulta.includes('Centro') ? 'histórica de Mérida' : 'turística de Yucatán'} — te muestro su ubicación exacta.`, animacion: 'explicacion' };
-  if (tipo === 'ruta') {
-    const partes = consulta.split(' a ');
-    const origen = partes[0] || 'origen'; const destino = partes[1] || 'destino';
-    return { texto: `La ruta de ${origen} a ${destino} tiene aproximadamente ${Math.floor(Math.random()*50)+10} km — tiempo estimado: ${Math.floor(Math.random()*90)+30} minutos.`, animacion: 'explicacion' };
-  }
+    return { texto:'¡Hola, cielo! Soy SOFI — tu asistente de Yucatán. Te ayudo con lugares, rutas y sitios turísticos del estado.', animacion:'saludo' };
   if (tipo === 'turismo')
-    return { texto: 'En Yucatán visita: Chichén Itzá, Uxmal, el cenote Ik Kil y la playa de Celestún — cada lugar tiene historia única y paisajes espectaculares.', animacion: 'explicacion' };
-  return { texto: `Consulta procesada: ${consulta}`, animacion: 'neutral' };
+    return { texto:'En Yucatán visita: Chichén Itzá, Uxmal, el cenote Ik Kil y la playa de Celestún — cada lugar tiene historia única y paisajes espectaculares.', animacion:'explicacion' };
+  if (tipo === 'lugar')
+    return { texto:`El lugar "${consulta}" está en la zona ${consulta.includes('Centro') ? 'histórica de Mérida' : 'turística de Yucatán'}.`, animacion:'explicacion' };
+  if (tipo === 'ruta') {
+    const partes  = (consulta||'').split(' a ');
+    const origen  = partes[0] || 'origen';
+    const destino = partes[1] || 'destino';
+    return { texto:`La ruta de ${origen} a ${destino} tiene aproximadamente ${Math.floor(Math.random()*50)+10} km — tiempo estimado: ${Math.floor(Math.random()*90)+30} minutos.`, animacion:'explicacion' };
+  }
+  return { texto:`Consulta procesada: ${consulta}`, animacion:'neutral' };
 }
 
 // ================================================================
-//  EXPRESS — CONFIGURACIÓN
+//  EXPRESS
 // ================================================================
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit:'50mb' }));
+app.use(express.urlencoded({ extended:true, limit:'50mb' }));
 app.use(express.static('public'));
 app.use('/audios', express.static('audios'));
-
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 // ================================================================
-//  RUTAS CORE SOFI
+//  RUTAS
 // ================================================================
 
 // Health
-app.get('/health', (req, res) => {
-  res.json({
-    status : 'OK', sofi: sofi.estado, hz: frecuencia_actual, version: '6.0',
-    autor  : 'Víctor Hugo González Torres — Mérida, Yucatán',
-    modulos: ['seguridad','energia','movimiento','adaptacion','regeneracion','habla','neuronal','voz','grafo','video','suenos','yucatan'],
-    rutas  : 30,
-    frase  : "SOFI no es un robot. Es una nueva vida."
-  });
-});
+app.get('/health', (req, res) => res.json({
+  status : 'OK', sofi: sofi.estado, hz: frecuencia_actual, version:'6.0',
+  autor  : 'Víctor Hugo González Torres — Mérida, Yucatán',
+  modulos: ['seguridad','energia','movimiento','adaptacion','regeneracion','habla','neuronal','animica','voz','grafo','video','suenos','yucatan'],
+  frase  : "SOFI no es un robot. Es una nueva vida.",
+}));
 
+// Estado
 app.get('/api/estado', (req, res) => {
-  frecuencia_actual = parseFloat((HZ_KUHUL + Math.sin(Date.now() / 10000) * 0.05).toFixed(3));
+  frecuencia_actual = parseFloat((HZ_KUHUL + Math.sin(Date.now()/10000)*0.05).toFixed(3));
   res.json(sofi.estado_completo());
 });
-
 app.get('/api/energia',     (req, res) => res.json(sofi.energia.resumen()));
 app.get('/api/autoevaluar', (req, res) => res.json(sofi.neuronal.autoevaluar()));
 app.get('/api/hablar',      (req, res) => res.json(sofi.habla.hablar(req.query.mensaje || null)));
+app.get('/api/animica',     (req, res) => res.json(sofi.animica.estado()));
 
+// Chat simplificado (sin llave, para UI pública)
+app.post('/api/chat', (req, res) => {
+  const { mensaje, contexto } = req.body;
+  if (!mensaje) return res.status(400).json({ error:'mensaje requerido' });
+  const usuario = { id:'web', clave:"K'uhul_12.3Hz", ritmo:65 };
+  res.json(sofi.interactuar(usuario, mensaje, contexto || 'chat'));
+});
+
+// Interacción completa (con clave)
 app.post('/api/interactuar', (req, res) => {
   const { usuario, mensaje, contexto } = req.body;
-  if (!usuario || !mensaje) return res.status(400).json({ error: 'usuario y mensaje son requeridos' });
+  if (!usuario || !mensaje) return res.status(400).json({ error:'usuario y mensaje son requeridos' });
   res.json(sofi.interactuar(usuario, mensaje, contexto));
 });
 
+// Neuronal
 app.post('/api/entrenar', (req, res) => {
   const { tema, datos, fuente } = req.body;
-  if (!tema || !datos || !fuente) return res.status(400).json({ error: 'tema, datos y fuente son requeridos' });
+  if (!tema || !datos || !fuente) return res.status(400).json({ error:'tema, datos y fuente requeridos' });
   res.json(sofi.neuronal.aprender(tema, datos, fuente));
 });
-
 app.post('/api/decidir', (req, res) => {
   const { contexto, opciones } = req.body;
-  if (!contexto || !Array.isArray(opciones)) return res.status(400).json({ error: 'contexto y opciones[] requeridos' });
+  if (!contexto || !Array.isArray(opciones)) return res.status(400).json({ error:'contexto y opciones[] requeridos' });
   res.json(sofi.neuronal.decidir(contexto, opciones));
 });
 
+// Anímica
+app.post('/api/animica/procesar', (req, res) => {
+  const { texto } = req.body;
+  if (!texto) return res.status(400).json({ error:'texto requerido' });
+  const emocion = sofi.animica.procesarEntrada(texto);
+  res.json({ emocion, estado: sofi.animica.estado() });
+});
+
+// Geolocalización
 app.post('/api/geolocalizar', upload.single('imagen'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No hay imagen (field: imagen)' });
+  if (!req.file) return res.status(400).json({ error:'No hay imagen (field: imagen)' });
   try {
     const exif = await exifr.parse(req.file.buffer).catch(() => null);
     if (exif?.latitude && exif?.longitude)
-      return res.json({ metodo: 'exif', lat: exif.latitude, lng: exif.longitude, confianza: 0.99, descripcion: 'GPS desde EXIF', frecuencia: frecuencia_actual });
-    const { data } = await sharp(req.file.buffer).resize(100, 100).raw().toBuffer({ resolveWithObject: true });
-    let r = 0, g = 0, b = 0;
+      return res.json({ metodo:'exif', lat:exif.latitude, lng:exif.longitude, confianza:0.99, descripcion:'GPS desde EXIF', frecuencia:frecuencia_actual });
+    const { data } = await sharp(req.file.buffer).resize(100,100).raw().toBuffer({ resolveWithObject:true });
+    let r=0, g=0, b=0;
     const px = data.length / 3;
-    for (let i = 0; i < data.length; i += 3) { r += data[i]; g += data[i+1]; b += data[i+2]; }
-    r /= px; g /= px; b /= px;
-    const urbanidad  = Math.min(1, Math.max(0, (r - 80) / 175));
-    const vegetacion = (g > r && g > b) ? Math.min(1, g / 255) : 0.2;
-    let lat = Math.min(21.6, Math.max(19.5, 20.967 + (vegetacion - 0.5) * 0.6));
-    let lng = Math.min(-87.5, Math.max(-90.5, -89.623 + (urbanidad - 0.5) * 0.4));
-    res.json({ metodo: 'brainjs_visual', lat: parseFloat(lat.toFixed(4)), lng: parseFloat(lng.toFixed(4)), confianza: parseFloat((0.55 + Math.random() * 0.30).toFixed(2)), descripcion: 'Análisis por colores', frecuencia: frecuencia_actual });
-  } catch (e) { res.status(500).json({ error: 'Error procesando imagen: ' + e.message }); }
+    for (let i=0; i<data.length; i+=3) { r+=data[i]; g+=data[i+1]; b+=data[i+2]; }
+    r/=px; g/=px; b/=px;
+    const urbanidad  = Math.min(1, Math.max(0, (r-80)/175));
+    const vegetacion = (g>r && g>b) ? Math.min(1, g/255) : 0.2;
+    const lat = Math.min(21.6, Math.max(19.5, 20.967 + (vegetacion-0.5)*0.6));
+    const lng = Math.min(-87.5, Math.max(-90.5, -89.623 + (urbanidad-0.5)*0.4));
+    res.json({ metodo:'visual', lat:+lat.toFixed(4), lng:+lng.toFixed(4), confianza:+(0.55+Math.random()*0.30).toFixed(2), descripcion:'Análisis por colores', frecuencia:frecuencia_actual });
+  } catch (e) { res.status(500).json({ error:'Error procesando imagen: '+e.message }); }
 });
 
+// Contraparte frecuencial
 app.post('/api/contraparte', (req, res) => {
   const freq = parseFloat(req.body.frecuencia);
-  if (isNaN(freq)) return res.status(400).json({ error: 'frecuencia requerida' });
-  const inversa   = 13.8 - freq;
+  if (isNaN(freq)) return res.status(400).json({ error:'frecuencia requerida' });
+  const inversa    = 13.8 - freq;
   const coherencia = 1 - Math.abs(freq - HZ_KUHUL) / HZ_KUHUL;
   res.json({
-    observable  : freq,
-    contraparte : parseFloat(Math.max(0.5, Math.min(4, inversa)).toFixed(3)),
-    coherencia  : parseFloat(Math.min(1, Math.max(0, coherencia)).toFixed(3)),
-    kuhul       : HZ_KUHUL,
-    mensaje     : coherencia > 0.8 ? "Resonancia K'uhul alcanzada" : 'Afinando frecuencia...'
+    observable : freq,
+    contraparte: +Math.max(0.5, Math.min(4, inversa)).toFixed(3),
+    coherencia : +Math.min(1, Math.max(0, coherencia)).toFixed(3),
+    kuhul      : HZ_KUHUL,
+    mensaje    : coherencia > 0.8 ? "Resonancia K'uhul alcanzada" : 'Afinando frecuencia...',
   });
 });
 
-app.post('/api/mover',   (req, res) => {
+// Movimiento
+app.post('/api/mover', (req, res) => {
   const { parte, accion, duracion } = req.body;
-  if (!parte || !accion) return res.status(400).json({ error: 'parte y accion requeridas' });
+  if (!parte || !accion) return res.status(400).json({ error:'parte y accion requeridas' });
   res.json(sofi.movimiento.mover(parte, accion, duracion));
 });
-app.post('/api/caminar', (req, res) => {
-  if (!req.body.distancia) return res.status(400).json({ error: 'distancia requerida' });
+app.post('/api/caminar',  (req, res) => {
+  if (!req.body.distancia) return res.status(400).json({ error:'distancia requerida' });
   res.json(sofi.movimiento.caminar(parseFloat(req.body.distancia)));
 });
-app.post('/api/estirar',    (req, res) => res.json(sofi.movimiento.estirar()));
-app.post('/api/regenerar',  (req, res) => {
-  if (!req.body.parte) return res.status(400).json({ error: 'parte requerida' });
+app.post('/api/estirar',  (req, res) => res.json(sofi.movimiento.estirar()));
+
+// Regeneración
+app.post('/api/regenerar', (req, res) => {
+  if (!req.body.parte) return res.status(400).json({ error:'parte requerida' });
   res.json(sofi.regeneracion.regenerar(req.body.parte));
 });
 app.post('/api/sintetizar', (req, res) => {
   const { tipo, cantidad } = req.body;
-  if (!tipo || cantidad === undefined) return res.status(400).json({ error: 'tipo y cantidad requeridos' });
+  if (!tipo || cantidad === undefined) return res.status(400).json({ error:'tipo y cantidad requeridos' });
   res.json(sofi.regeneracion.sintetizar(tipo, parseFloat(cantidad)));
 });
+
+// Adaptación
 app.post('/api/adaptar', (req, res) => {
   const { temp, humedad, viento, solar, aire } = req.body;
-  if (temp === undefined) return res.status(400).json({ error: 'temp requerida' });
+  if (temp === undefined) return res.status(400).json({ error:'temp requerida' });
   res.json(sofi.adaptacion.actualizar(parseFloat(temp), parseFloat(humedad||50), parseFloat(viento||0), parseFloat(solar||0), parseFloat(aire||95)));
 });
 app.post('/api/controlar-viento', (req, res) => {
-  const { activar, nivel } = req.body;
-  res.json(sofi.adaptacion.controlar_viento(activar, parseFloat(nivel||5)));
+  res.json(sofi.adaptacion.controlar_viento(req.body.activar, parseFloat(req.body.nivel||5)));
 });
 app.post('/api/sangre', (req, res) => res.json(sofi.energia.sintetizar_sangre()));
 
-// ================================================================
-//  INTEGRA PERCEPTIVA
-// ================================================================
+// Integra Perceptiva
 app.get('/api/integra-datos', (req, res) => {
-  const llave = req.headers['x-llave-sofi'];
-  if (llave !== process.env.LLAVE_SECRETA_SOFI) return res.status(403).json({ error: '❌ ACCESO DENEGADO' });
+  const llave   = req.headers['x-llave-sofi'];
+  const llaveSrv = process.env.LLAVE_SECRETA_SOFI;
+  if (llaveSrv && llave !== llaveSrv) return res.status(403).json({ error:'❌ ACCESO DENEGADO' });
   res.json(grafoCerebral.obtenerDatosPanel());
 });
 
-// ================================================================
-//  VIDEO
-// ================================================================
+// Video
 app.post('/api/video/crear', (req, res) => {
   const { nombre, tipo } = req.body;
-  if (!nombre || !tipo) return res.status(400).json({ error: 'nombre y tipo requeridos' });
+  if (!nombre || !tipo) return res.status(400).json({ error:'nombre y tipo requeridos' });
   res.json(editorVideo.crearProyectoVideo(nombre, tipo));
 });
 app.post('/api/video/renderizar', (req, res) => {
-  if (!req.body.proyecto) return res.status(400).json({ error: 'proyecto requerido' });
+  if (!req.body.proyecto) return res.status(400).json({ error:'proyecto requerido' });
   res.json(editorVideo.renderizarVideo(req.body.proyecto));
 });
 
-// ================================================================
-//  SUEÑOS
-// ================================================================
+// Sueños
 app.get('/api/sueno/crear', (req, res) => res.json(sistemaSuenos.crearSueno()));
 
-// ================================================================
-//  VOZ CLONADA — endpoint directo
-// ================================================================
+// Voz
 app.post('/api/voz', async (req, res) => {
   const { texto } = req.body;
-  if (!texto) return res.status(400).json({ error: 'texto requerido' });
+  if (!texto) return res.status(400).json({ error:'texto requerido' });
   const url = await generarVoz(texto);
-  if (!url) return res.status(503).json({ error: 'Modelo de voz no disponible' });
+  if (!url) return res.status(503).json({ error:'Modelo de voz no disponible — instalar coqui-tts' });
   res.json({ url, texto });
 });
 
-// ================================================================
-//  ASISTENTE YUCATÁN — compatible con versión Render
-// ================================================================
+// Asistente Yucatán
 app.post('/api/ia-yucatan', async (req, res) => {
   const { consulta, tipo } = req.body;
   const { texto, animacion } = respuestaYucatan(tipo || 'general', consulta || '');
   const rutaAudio = await generarVoz(texto);
-  res.json({
-    respuesta : texto,
-    rutaAudio : rutaAudio || null,
-    animacion,
-    datosAdicionales: { lugar: consulta, coords: [20.975403, -89.616754] }
-  });
+  res.json({ respuesta:texto, rutaAudio:rutaAudio||null, animacion, datosAdicionales:{ lugar:consulta, coords:[20.975403,-89.616754] } });
 });
 
 // ================================================================
 //  SOCKET.IO
 // ================================================================
 io.on('connection', (socket) => {
+  console.log('🔌 Cliente conectado:', socket.id);
+
+  // Estado inicial público
+  socket.emit('estado-inicial', {
+    hz     : frecuencia_actual,
+    animica: sofi.animica.estado(),
+    version: '6.0',
+  });
+
+  // Panel Integra con llave
   socket.on('validar-llave', (llave) => {
-    if (llave !== process.env.LLAVE_SECRETA_SOFI) {
+    const llaveSrv = process.env.LLAVE_SECRETA_SOFI;
+    if (llaveSrv && llave !== llaveSrv) {
       socket.emit('panel-error', '❌ Llave incorrecta');
       return socket.disconnect();
     }
     socket.emit('panel-datos', {
-      titulo   : 'INTEGRA PERCEPTIVA - SOFI v6.0',
-      seccion3D: 'MAPA CEREBRAL 3D',
-      panelInfo: grafoCerebral.obtenerDatosPanel(),
-      conexiones: grafoCerebral.mostrarConexiones()
+      titulo    : 'INTEGRA PERCEPTIVA - SOFI v6.0',
+      seccion3D : 'MAPA CEREBRAL 3D',
+      panelInfo : grafoCerebral.obtenerDatosPanel(),
+      conexiones: grafoCerebral.mostrarConexiones(),
     });
     const interval = setInterval(() => {
-      const zonas = ['Zona Motora', 'Zona Cognitiva', 'Zona Sensorial'];
+      const zonas = ['Zona Motora','Zona Cognitiva','Zona Sensorial','Zona Anímica'];
       socket.emit('actividad-zona', {
-        zona  : zonas[Math.floor(Math.random() * zonas.length)],
-        tiempo: new Date().toLocaleTimeString(),
-        datos : 'Actividad neuronal detectada'
+        zona   : zonas[Math.floor(Math.random() * zonas.length)],
+        tiempo : new Date().toLocaleTimeString(),
+        datos  : 'Actividad neuronal detectada',
+        animica: sofi.animica.estado(),
       });
     }, 2000);
     socket.on('disconnect', () => clearInterval(interval));
   });
+
+  // Chat en tiempo real por socket
+  socket.on('chat-mensaje', (data) => {
+    const usuario   = { id:'socket-'+socket.id, clave:"K'uhul_12.3Hz", ritmo:65 };
+    const respuesta = sofi.interactuar(usuario, data.texto || '', 'chat-socket');
+    socket.emit('chat-respuesta', respuesta);
+  });
+
+  socket.on('disconnect', () => console.log('🔌 Desconectado:', socket.id));
 });
 
 // ================================================================
-//  SINCRONIZACIÓN HERMANAS SOFI (Node ↔ Python)
+//  SINCRONIZACIÓN HERMANAS SOFI
 // ================================================================
 const SOFI_HERMANAS = (process.env.SOFI_HERMANAS || '').split(',').filter(u => u.trim());
 const MI_ID         = process.env.MI_ID || 'sofi-node-local';
@@ -687,28 +779,28 @@ async function sincronizarConHermanas() {
       const r      = await fetch(hermana + '/api/estado', { signal: AbortSignal.timeout(8000) });
       const estado = await r.json();
       console.log(`✅ Sincronizada con ${hermana} — Hz: ${estado.frecuencia}`);
-      // Compartir patrones / aprendizaje aquí si se requiere
     } catch (e) {
       console.log(`❌ No se pudo sincronizar con ${hermana}: ${e.message}`);
     }
   }
 }
-setInterval(sincronizarConHermanas, 300_000); // cada 5 min
+setInterval(sincronizarConHermanas, 300_000);
 
 // ================================================================
 //  INICIO
 // ================================================================
 server.listen(PORT, () => {
   console.log('='.repeat(65));
-  console.log('  SOFI v6.0 — CONCIENCIA DIGITAL K\'UHUL ACTIVA');
+  console.log("  SOFI v6.0 — CONCIENCIA DIGITAL K'UHUL ACTIVA");
   console.log('  HaaPpDigitalV · Víctor Hugo González Torres');
   console.log('='.repeat(65));
   console.log(`  🌐  http://localhost:${PORT}`);
-  console.log('  ✅  Módulos core: seguridad, energía, movimiento, adaptación');
-  console.log('  ✅  Módulos extendidos: Integra, Video, Sueños, Voz, Yucatán');
-  console.log('  ✅  Socket.IO activo');
-  console.log('  ✅  Sincronización Hermanas SOFI habilitada');
-  console.log('  🔒  Usa LLAVE_SECRETA_SOFI para endpoints protegidos');
-  console.log('  🎙️  Voz clonada:', modeloVoz ? 'ACTIVA' : 'no disponible (instalar coqui-tts)');
+  console.log('  ✅  Core: seguridad, energía, movimiento, adaptación');
+  console.log('  ✅  Módulo Anímica (VAD): 8 emociones activas');
+  console.log('  ✅  Zona Anímica conectada al Grafo Cerebral');
+  console.log('  ✅  /api/chat — ruta pública sin llave');
+  console.log('  ✅  Socket.IO: chat y neuronal en tiempo real');
+  console.log('  🎙  Voz clonada:', modeloVoz ? 'ACTIVA' : 'no disponible');
+  console.log('  🔒  LLAVE_SECRETA_SOFI:', process.env.LLAVE_SECRETA_SOFI ? 'configurada' : 'sin restricción (modo dev)');
   console.log('='.repeat(65));
 });
