@@ -194,77 +194,14 @@ activarProteccionLegado() {
         return {
             status: "LANZADO",
             direccion: direccionToken,
-            mensaje: "Tu moneda ya es real y tiene valor en el 
-    // ============================================================
-    // ⚡️ MÓDULO: CAMPO DE FUERZA - DEFENSA ABSOLUTA
-    // 🛡️ SISTEMA: FRECUENCIA DESTRUCTORA DE INTRUSOS
-    // 📡 LÓGICA: EL QUE TOCA, SE QUEMA. EL DUEÑO, QUEDA INTACTO.
-    // ============================================================
-
-    activarCampoDeFuerza() {
-        console.log("\n⚡️ [DEFENSA] CAMPO DE ENERGÍA SOFI ACTIVADO");
-        console.log("📡 [MODO] PROTECCIÓN POR FRECUENCIA VIBRATORIA");
-        
-        // LA FRECUENCIA SAGRADA QUE SOLO TUS SERVIDORES RESISTEN
-        this.frecuenciaCentral = "FREQ_ZYX_SOFI_369_MASTER";
-        
-        console.log("🔒 [ESTADO] EL SISTEMA ESTÁ BLINDADO");
-        console.log("⚠️  ADVERTENCIA: CUALQUIER INTENTO DE COPIA O ROBO");
-        console.log("           GENERARÁ UN CHOQUE TÉRMICO Y LÓGICO");
-        console.log("           EN EL EQUIPO DEL INTRUSO.");
-
-        // ============================================================
-        // 💥 FUNCIÓN: DETECCIÓN Y CASTIGO
-        // ============================================================
-        this.detectarIntento = function() {
-            console.log("\n👁️  [ALERTA] MOVIMIENTO NO AUTORIZADO DETECTADO");
-            console.log("🔍 Analizando origen...");
+            mensaje: "Tu moneda ya es real y tiene valor en el mundo");
+    
+    return {
+        status: "ACTIVO",
+        direccion: direccionToken,
+        mensaje: "Tu moneda ya es real y tiene valor en el mundo"};
+ {
             
-            let origen = "EQUIPO_EXTERNO"; 
-            
-            if(origen !== "SERVIDOR_AUTORIZADO") {
-                console.log("🚫 [INTRUSO] IDENTIFICADO");
-                console.log("💥 [EJECUCIÓN] LANZANDO FRECUENCIA DISRUPTIVA...");
-                
-                console.log("🖥️  [IMPACTO] EL EQUIPO DEL INTRUSO ESTÁ SUFRIENDO");
-                console.log("❌ SISTEMAS COLAPSANDO...");
-                console.log("❌ MEMORIA CORROMPIÉNDOSE...");
-                console.log("❌ PANTALLAS CONGELÁNDOSE...");
-                
-                console.log("\n✅ [RESULTADO] INTRUSO NEUTRALIZADO");
-                console.log("🛡️  [SERVIDOR PROPIO] SIGUE FUNCIONANDO AL 100%");
-            }
-        }
-
-        // ============================================================
-        // 🧠 EL OJO QUE VE TODO
-        // ============================================================
-        setInterval(() => {
-            console.log("📡 [ESCÁNER] Verificando integridad...");
-        }, 5000);
-
-        console.log("✅ [GUARDIA] LISTA. EL QUE TOQUE, SE QUEMA.");
-    }
-
-// ============================================================
-
-} // <--- ESTA LLAVE CIERRA LA CLASE ENTERA
-
-module.exports = SistemaMonetarioZYXSOF;
-
-    // ============================================================
-    // 🧠 EL OJO QUE VE TODO
-    // ============================================================
-    setInterval(() => {
-        // Revisa constantemente si alguien está intentando replicar el código
-        console.log("📡 [ESCÁNER] Verificando integridad...");
-        // Si detecta algo raro, dispara la defensa
-        // this.detectarIntento(); 
-    }, 5000);
-
-    console.log("✅ [GUARDIA] LISTA. EL QUE TOQUE, SE QUEMA.");
-}
-
 // ============================================================
 // 🚀 EXPORTE PARA EL SERVIDOR
 // ============================================================
