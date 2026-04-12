@@ -12,7 +12,7 @@ const PORT = 3000;
 
 // ⚠️ En producción usa variable de entorno:
 // const URL_BANCO = process.env.URL_BANCO_PRINCIPAL || "http://localhost:5000";
-const URL_BANCO = process.env.URL_BANCO_PRINCIPAL || "http://localhost:5000";
+const URL_BANCO = "https://bank-kusofin-core.onrender.com";
 
 app.use(express.json());
 
