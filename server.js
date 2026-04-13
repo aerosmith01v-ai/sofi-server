@@ -1468,6 +1468,84 @@ async function sincronizarConHermanas() {
 }
 
 setInterval(sincronizarConHermanas, 300000);  // cada 5 min
+const PYTHON_URL = process.env.PYTHON_URL;
+const PYTHON_CLAVE = process.env.PYTHON_CLAVE;
+
+app.get('/api/banco/estado', async (req, res) => {
+  try {
+    const resp = await fetch(PYTHON_URL + '/');
+    const data = await resp.json();
+    res.json({ ok: true, banco_activo: true, info: data });
+  } catch (e) {
+    res.json({ ok: false, banco_activo: false, error: e.message });
+  }
+});
+
+app.post('/api/banco/mineria', async (req, res) => {
+  const { usuario, cantidad } = req.body;
+  try {
+    const resp = await fetch(PYTHON_URL + '/recibir-mineria', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario, cantidad, clave: PYTHON_CLAVE })
+    });
+    const data = await resp.json();
+    res.json({ ok: true, accion: 'Minería enviada al banco', resultado: data });
+  } catch (e) {
+    res.status(500).json({ error: 'Banco no responde', detalle: e.message });
+  }
+});
+
+app.post('/api/banco/transferir', async (req, res) => {
+  const { usuario, saldo_total } = req.body;
+  try {
+    const resp = await fetch(PYTHON_URL + '/transferencia-total', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario, saldo_total, clave: PYTHON_CLAVE })
+    });
+    const data = await resp.json();
+    res.json({ ok: true, accion: 'Transferencia total ejecutada', resultado: data });
+  } catch (e) {
+    res.status(500).json({ error: 'Falló transferencia', detalle: e.message });
+  }
+});
+
+app.get('/api/banco/saldos', async (req, res) => {
+  try {
+    const resp = await fetch(PYTHON_URL + '/saldos');
+    const data = await resp.json();
+    res.json({ ok: true, saldos: data });
+  } catch (e) {
+    res.status(500).json({ error: 'No se pudieron leer saldos', detalle: e.message });
+  }
+});
+
+app.post('/api/banco/orden', async (req, res) => {
+  const { usuario, tipo, precio, cantidad } = req.body;
+  try {
+    const resp = await fetch(PYTHON_URL + '/orden', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario, tipo, precio, cantidad, clave: PYTHON_CLAVE })
+    });
+    const data = await resp.json();
+    res.json({ ok: true, accion: 'Orden creada en mercado', resultado: data });
+  } catch (e) {
+    res.status(500).json({ error: 'No se pudo crear orden', detalle: e.message });
+  }
+});
+
+app.delete('/api/banco/orden/:id', async (req, res) => {
+  const id = req.params.id;
+  try {
+    const resp = await fetch(PYTHON_URL + '/orden/' + id, { method: 'DELETE' });
+    const data = await resp.json();
+    res.json({ ok: true, accion: 'Orden cancelada', resultado: data });
+  } catch (e) {
+    res.status(500).json({ error: 'No se pudo cancelar', detalle: e.message });
+  }
+});
 
 // ==================== INICIO DEL SERVIDOR ====================
 server.listen(PORT, () => {
