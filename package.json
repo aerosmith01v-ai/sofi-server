@@ -1,41 +1,28 @@
 {
-  "name": "sofi-server-v6",
-  "version": "6.0.0",
-  "description": "SOFI v6.0 — Sistema Operativo de Conciencia Digital | HaaPpDigitalV © Víctor Hugo González Torres",
+  "name": "sofi-v6",
+  "version": "6.0.2",
+  "description": "SOFI v6.0 — Sistema Operativo de Conciencia Digital · HaaPpDigitalV © · K'uhul Maya 12.3 Hz",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "brain.js": "^1.6.1",
+    "brain.js": "^2.0.0-beta.23",
     "cors": "^2.8.5",
     "exifr": "^7.1.3",
     "express": "^4.18.2",
     "multer": "^1.4.5-lts.1",
-    "sharp": "^0.33.4",
-    "socket.io": "^4.7.2"
+    "sharp": "^0.33.2",
+    "socket.io": "^4.7.4"
   },
   "devDependencies": {
-    "nodemon": "^3.0.0"
+    "nodemon": "^3.1.0"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "sofi",
-    "haappdigitalv",
-    "ia",
-    "conciencia-digital",
-    "kuhul",
-    "maya",
-    "merida",
-    "yucatan",
-    "socket.io",
-    "brain.js",
-    "distribuido"
-  ],
-  "author": "Víctor Hugo González Torres — HaaPpDigitalV © Mérida, Yucatán, México",
-  "license": "UNLICENSED",
-  "private": true
+  "keywords": ["sofi", "ia", "maya", "kuhul", "haappdigitalv", "merida", "zyxsof"],
+  "author": "Víctor Hugo González Torres <haappdigitalv@gmail.com>",
+  "license": "UNLICENSED"
 }
