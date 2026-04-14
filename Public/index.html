@@ -1,498 +1,784 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SOFI v6.0 · K'uhul Maya 12.3 Hz</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', 'Courier New', monospace; }
-    body { 
-      background: radial-gradient(circle at 20% 30%, #1a120b, #0d0907);
-      min-height: 100vh; 
-      color: #f5e6d3; 
-      padding: 20px; 
-    }
-    .container { max-width: 1400px; margin: 0 auto; }
-    
-    /* Tema Maya-Dorado */
-    :root {
-      --oro: #d4af37;
-      --oro-claro: #f9e076;
-      --oro-oscuro: #9a7b1c;
-      --jade: #2d8a6e;
-      --obsidiana: #1a1a2e;
-      --cielo-maya: #4a90d9;
-    }
-    
-    /* Header */
-    .header { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      padding: 20px 0; 
-      border-bottom: 2px solid var(--oro); 
-      margin-bottom: 25px; 
-    }
-    .logo h1 { 
-      font-size: 2.8rem; 
-      font-weight: 400; 
-      letter-spacing: 6px; 
-      text-shadow: 0 0 15px var(--oro); 
-    }
-    .logo span { color: var(--oro); font-weight: 700; }
-    .logo small { 
-      font-size: 1rem; 
-      color: var(--oro-claro); 
-      letter-spacing: 3px; 
-      margin-left: 10px; 
-    }
-    .kuhul-badge { 
-      background: rgba(212, 175, 55, 0.1); 
-      padding: 12px 24px; 
-      border-radius: 60px; 
-      border: 1.5px solid var(--oro); 
-      box-shadow: 0 0 30px rgba(212, 175, 55, 0.3); 
-      backdrop-filter: blur(5px);
-      text-align: center;
-    }
-    .kuhul-badge .hz { 
-      font-size: 2.5rem; 
-      font-weight: 700; 
-      color: var(--oro-claro); 
-      text-shadow: 0 0 20px var(--oro); 
-    }
-    .kuhul-badge .maya-glyph {
-      font-size: 0.9rem;
-      color: var(--jade);
-      letter-spacing: 3px;
-    }
-    
-    /* Grid */
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
-    
-    /* Cards estilo cyber-maya */
-    .card { 
-      background: rgba(10, 8, 5, 0.75); 
-      backdrop-filter: blur(8px); 
-      border: 1px solid var(--oro-oscuro); 
-      border-radius: 20px; 
-      padding: 22px; 
-      box-shadow: 0 8px 25px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(212, 175, 55, 0.1); 
-      transition: all 0.3s ease; 
-      position: relative;
-      overflow: hidden;
-    }
-    .card::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, var(--oro), transparent);
-    }
-    .card:hover { 
-      border-color: var(--oro); 
-      box-shadow: 0 0 35px rgba(212, 175, 55, 0.25), inset 0 0 15px rgba(212, 175, 55, 0.05); 
-    }
-    .card-title { 
-      font-size: 1.1rem; 
-      text-transform: uppercase; 
-      letter-spacing: 3px; 
-      color: var(--oro-claro); 
-      margin-bottom: 18px; 
-      display: flex; 
-      align-items: center; 
-      gap: 10px; 
-      border-left: 3px solid var(--oro);
-      padding-left: 12px;
-    }
-    .value-large { 
-      font-size: 3.2rem; 
-      font-weight: 300; 
-      line-height: 1.2; 
-      color: var(--oro-claro); 
-    }
-    .unit { font-size: 1rem; color: #b89f6e; margin-left: 5px; }
-    .progress-bar { 
-      height: 10px; 
-      background: #1e160e; 
-      border-radius: 20px; 
-      margin: 15px 0; 
-      overflow: hidden; 
-      border: 1px solid var(--oro-oscuro);
-    }
-    .progress-fill { 
-      height: 100%; 
-      background: linear-gradient(90deg, var(--oro-oscuro), var(--oro), var(--oro-claro)); 
-      border-radius: 20px; 
-      width: 0%; 
-      transition: width 0.5s; 
-      box-shadow: 0 0 10px var(--oro);
-    }
-    .stat-row { 
-      display: flex; 
-      justify-content: space-between; 
-      margin: 12px 0; 
-      padding: 5px 0; 
-      border-bottom: 1px dashed rgba(212, 175, 55, 0.3); 
-    }
-    .stat-label { color: #b89f6e; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; }
-    .stat-value { color: var(--oro-claro); font-weight: 600; font-size: 1.2rem; }
-    
-    /* Botones Maya */
-    .btn { 
-      background: transparent; 
-      border: 1.5px solid var(--oro); 
-      color: var(--oro); 
-      padding: 12px 24px; 
-      border-radius: 40px; 
-      font-size: 1rem; 
-      font-weight: 600; 
-      text-transform: uppercase; 
-      letter-spacing: 2px; 
-      cursor: pointer; 
-      transition: all 0.3s; 
-      margin: 5px; 
-      backdrop-filter: blur(5px);
-    }
-    .btn:hover { 
-      background: var(--oro); 
-      color: #0a0805; 
-      box-shadow: 0 0 30px var(--oro); 
-      transform: translateY(-2px); 
-    }
-    .btn-small { padding: 8px 16px; font-size: 0.85rem; }
-    .input-group { 
-      display: flex; 
-      gap: 10px; 
-      margin: 15px 0; 
-      flex-wrap: wrap; 
-    }
-    .input-field { 
-      background: rgba(0,0,0,0.4); 
-      border: 1px solid var(--oro-oscuro); 
-      color: var(--oro-claro); 
-      padding: 12px 18px; 
-      border-radius: 40px; 
-      font-size: 1rem; 
-      flex: 1; 
-      min-width: 150px; 
-    }
-    .input-field:focus { 
-      outline: none; 
-      border-color: var(--oro); 
-      box-shadow: 0 0 15px var(--oro); 
-    }
-    .input-field::placeholder { color: #6a5a3e; }
-    
-    /* Gráfico simple */
-    .chart-container { 
-      height: 100px; 
-      display: flex; 
-      align-items: flex-end; 
-      gap: 5px; 
-      margin: 20px 0; 
-    }
-    .chart-bar { 
-      flex: 1; 
-      background: linear-gradient(0deg, var(--oro-oscuro), var(--oro)); 
-      border-radius: 5px 5px 0 0; 
-      min-height: 3px; 
-      transition: height 0.3s; 
-      border: 1px solid rgba(212, 175, 55, 0.5);
-    }
-    
-    /* Glifos mayas decorativos */
-    .glyph-corner {
-      position: absolute;
-      bottom: 10px;
-      right: 15px;
-      opacity: 0.15;
-      font-size: 3rem;
-      color: var(--oro);
-    }
-    
-    /* Estado de conexión */
-    .connection-led {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #2d8a6e;
-      box-shadow: 0 0 15px #2d8a6e;
-      margin-right: 8px;
-    }
-    .footer {
-      text-align: center;
-      margin-top: 40px;
-      padding: 20px;
-      color: #8a7b5c;
-      border-top: 1px solid var(--oro-oscuro);
-      font-size: 0.9rem;
-      letter-spacing: 2px;
-    }
-    .footer strong { color: var(--oro); }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SOFI v6.0 — Sistema Operativo de Conciencia Digital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&family=Share+Tech+Mono&family=Cinzel:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<style>
+/* ── VARIABLES ───────────────────────────────────────────── */
+:root {
+  --bg:        #030b10;
+  --bg2:       #050f18;
+  --panel:     #071624;
+  --border:    #0d3a5c;
+  --kuhul:     #00ffe5;
+  --kuhul2:    #00a8c8;
+  --gold:      #e8c94a;
+  --gold2:     #b8961e;
+  --red:       #ff3c5a;
+  --green:     #00e676;
+  --text:      #c8e8f8;
+  --text-dim:  #4a7a9a;
+  --glow:      0 0 18px #00ffe580, 0 0 40px #00ffe520;
+  --glow-gold: 0 0 12px #e8c94a60;
+  --font-main: 'Rajdhani', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --font-deco: 'Cinzel', serif;
+}
+
+/* ── RESET ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 15px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* ── FONDO MAYA GEOMÉTRICO ───────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    repeating-linear-gradient(0deg,   transparent, transparent 59px, #0d3a5c18 60px),
+    repeating-linear-gradient(90deg,  transparent, transparent 59px, #0d3a5c18 60px);
+  pointer-events: none;
+  z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed;
+  top: -30vh; right: -20vw;
+  width: 80vw; height: 80vw;
+  background: radial-gradient(circle, #00ffe508 0%, transparent 65%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ── LAYOUT ─────────────────────────────────────────────── */
+#app {
+  position: relative; z-index: 1;
+  max-width: 1200px; margin: 0 auto;
+  padding: 0 16px 60px;
+}
+
+/* ── HEADER ─────────────────────────────────────────────── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 0 12px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px; flex-wrap: wrap;
+}
+.logo {
+  display: flex; flex-direction: column;
+}
+.logo-title {
+  font-family: var(--font-deco);
+  font-size: 1.7rem; font-weight: 700;
+  color: var(--kuhul);
+  text-shadow: var(--glow);
+  letter-spacing: 0.15em;
+}
+.logo-sub {
+  font-family: var(--font-mono);
+  font-size: 0.72rem; color: var(--text-dim);
+  letter-spacing: 0.2em;
+}
+.hz-badge {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--gold);
+  border: 1px solid var(--gold2);
+  padding: 4px 10px; border-radius: 3px;
+  text-shadow: var(--glow-gold);
+  animation: pulse-badge 3s ease-in-out infinite;
+}
+@keyframes pulse-badge {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.6; }
+}
+
+/* ── STATUS BAR ──────────────────────────────────────────── */
+#status-bar {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 10px 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+.stat-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--panel); border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 20px;
+  font-family: var(--font-mono); font-size: 0.75rem;
+}
+.stat-pill .label { color: var(--text-dim); }
+.stat-pill .val   { color: var(--kuhul); font-weight: 700; }
+.stat-pill.ok  .val { color: var(--green); }
+.stat-pill.warn .val { color: var(--gold); }
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: blink 1.8s ease-in-out infinite;
+}
+.dot.warn { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── MAIN GRID ───────────────────────────────────────────── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 16px; margin-top: 16px;
+}
+@media (max-width: 800px) {
+  .main-grid { grid-template-columns: 1fr; }
+}
+
+/* ── PANEL BASE ──────────────────────────────────────────── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.panel-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-deco); font-size: 0.8rem;
+  color: var(--kuhul); letter-spacing: 0.12em;
+}
+.panel-header .icon { font-size: 1rem; }
+
+/* ── CHAT ────────────────────────────────────────────────── */
+#chat-messages {
+  height: 420px; overflow-y: auto;
+  padding: 14px 16px; display: flex;
+  flex-direction: column; gap: 10px;
+}
+#chat-messages::-webkit-scrollbar { width: 4px; }
+#chat-messages::-webkit-scrollbar-track { background: transparent; }
+#chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.msg {
+  display: flex; flex-direction: column; gap: 2px;
+  animation: slide-in 0.25s ease;
+}
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.msg-user { align-items: flex-end; }
+.msg-sofi  { align-items: flex-start; }
+
+.bubble {
+  max-width: 88%; padding: 9px 14px;
+  border-radius: 10px; font-size: 0.92rem; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+}
+.msg-user .bubble {
+  background: linear-gradient(135deg, #00ffe520, #00ffe510);
+  border: 1px solid #00ffe540; color: #e0fff8;
+  border-bottom-right-radius: 2px;
+}
+.msg-sofi .bubble {
+  background: #071e30;
+  border: 1px solid var(--border); color: var(--text);
+  border-bottom-left-radius: 2px;
+}
+.msg-sofi.banco .bubble {
+  border-color: var(--gold2);
+  background: linear-gradient(135deg, #1a1200, #0a0800);
+}
+.msg-time {
+  font-family: var(--font-mono); font-size: 0.62rem;
+  color: var(--text-dim); padding: 0 4px;
+}
+.accion-tag {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  color: var(--gold); background: #1a100040;
+  padding: 1px 6px; border-radius: 2px;
+  border: 1px solid var(--gold2); margin-right: 4px;
+}
+
+/* ── INPUT CHAT ──────────────────────────────────────────── */
+.chat-input-row {
+  display: flex; gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+#msg-input {
+  flex: 1;
+  background: #040e18; border: 1px solid var(--border);
+  border-radius: 4px; color: var(--text);
+  font-family: var(--font-main); font-size: 0.95rem;
+  padding: 9px 14px; outline: none;
+  transition: border-color 0.2s;
+}
+#msg-input:focus { border-color: var(--kuhul); }
+#msg-input::placeholder { color: var(--text-dim); }
+#btn-send {
+  background: linear-gradient(135deg, #00ffe520, #00ffe508);
+  border: 1px solid var(--kuhul2);
+  color: var(--kuhul); font-family: var(--font-deco);
+  font-size: 0.78rem; letter-spacing: 0.1em;
+  padding: 9px 18px; border-radius: 4px; cursor: pointer;
+  transition: all 0.2s;
+}
+#btn-send:hover { background: #00ffe530; box-shadow: var(--glow); }
+#btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── ATAJOS RÁPIDOS ──────────────────────────────────────── */
+.quick-btns {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 8px 16px 10px;
+  border-top: 1px solid var(--border);
+}
+.qbtn {
+  background: #040e18; border: 1px solid var(--border);
+  color: var(--text-dim); font-family: var(--font-mono);
+  font-size: 0.68rem; padding: 4px 10px; border-radius: 12px;
+  cursor: pointer; transition: all 0.15s;
+}
+.qbtn:hover { border-color: var(--kuhul); color: var(--kuhul); }
+
+/* ── PANEL DERECHO ───────────────────────────────────────── */
+.right-panels { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── GRAFO NODOS ─────────────────────────────────────────── */
+#grafo-container { padding: 14px 16px; }
+.nodo-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 7px;
+}
+.nodo-name {
+  font-family: var(--font-mono); font-size: 0.7rem;
+  color: var(--text-dim); width: 72px; text-align: right;
+}
+.nodo-bar-bg {
+  flex: 1; height: 8px; background: #040e18;
+  border-radius: 4px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+.nodo-bar {
+  height: 100%; border-radius: 4px;
+  background: linear-gradient(90deg, var(--kuhul2), var(--kuhul));
+  transition: width 0.8s ease;
+  box-shadow: 0 0 6px #00ffe540;
+}
+.nodo-val {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  color: var(--kuhul); width: 38px;
+}
+
+/* ── FRECUENCIA VISUALIZER ───────────────────────────────── */
+#freq-panel { padding: 14px 16px; text-align: center; }
+canvas#freq-canvas {
+  width: 100%; height: 70px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: #040e18; display: block;
+}
+.freq-number {
+  font-family: var(--font-deco); font-size: 1.6rem;
+  color: var(--kuhul); text-shadow: var(--glow);
+  margin: 8px 0 2px;
+}
+.freq-label {
+  font-family: var(--font-mono); font-size: 0.68rem;
+  color: var(--text-dim); letter-spacing: 0.15em;
+}
+.union-bar-wrap {
+  margin-top: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.union-bar-wrap span {
+  font-family: var(--font-mono); font-size: 0.68rem;
+  color: var(--text-dim); white-space: nowrap;
+}
+.union-bar-bg {
+  flex: 1; height: 6px; background: #040e18;
+  border-radius: 3px; border: 1px solid var(--border); overflow: hidden;
+}
+.union-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold2), var(--gold));
+  transition: width 1s ease;
+  border-radius: 3px;
+}
+
+/* ── VISION PANEL ────────────────────────────────────────── */
+#vision-panel { padding: 14px 16px; }
+#vision-drop {
+  border: 2px dashed var(--border); border-radius: 6px;
+  padding: 22px 12px; text-align: center; cursor: pointer;
+  transition: all 0.2s; color: var(--text-dim);
+  font-family: var(--font-mono); font-size: 0.75rem;
+}
+#vision-drop:hover { border-color: var(--kuhul); color: var(--kuhul); }
+#vision-file { display: none; }
+#vision-result { margin-top: 10px; font-family: var(--font-mono); font-size: 0.72rem; }
+#vision-thumb { max-width: 100%; border-radius: 4px; margin-top: 8px; display: none; }
+
+/* ── LOG / EVENTOS ───────────────────────────────────────── */
+#log-panel { padding: 10px 16px; }
+#log-list {
+  max-height: 160px; overflow-y: auto;
+  font-family: var(--font-mono); font-size: 0.68rem;
+  color: var(--text-dim);
+}
+#log-list::-webkit-scrollbar { width: 3px; }
+#log-list::-webkit-scrollbar-thumb { background: var(--border); }
+.log-entry { padding: 2px 0; border-bottom: 1px solid #0d3a5c30; }
+.log-entry.ok   { color: var(--green); }
+.log-entry.warn { color: var(--gold); }
+.log-entry.err  { color: var(--red); }
+
+/* ── CONEXIÓN INDICATOR ──────────────────────────────────── */
+#conn-status {
+  font-family: var(--font-mono); font-size: 0.7rem;
+  padding: 5px 12px; border-radius: 12px;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; gap: 6px;
+}
+#conn-status.connected { color: var(--green); border-color: var(--green); }
+#conn-status.disconnected { color: var(--red); border-color: var(--red); }
+
+/* ── SCROLLBAR GLOBAL ────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── FOOTER ──────────────────────────────────────────────── */
+footer {
+  text-align: center; padding: 20px 0 0;
+  font-family: var(--font-mono); font-size: 0.65rem;
+  color: var(--text-dim); letter-spacing: 0.12em;
+}
+footer span { color: var(--kuhul); }
+</style>
 </head>
 <body>
-  <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <div class="logo">
-        <h1>🧠 SOFI <span>v6.0</span></h1>
-        <small>⚡ HaaPpDigitalV · K'uhul Maya</small>
-      </div>
-      <div class="kuhul-badge">
-        <div class="hz" id="freqDisplay">12.30 Hz</div>
-        <div class="maya-glyph">⚡ K'UHUL · ITZAMNÁ ⚡</div>
-      </div>
+<div id="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <span class="logo-title">SOFI</span>
+      <span class="logo-sub">SISTEMA OPERATIVO DE CONCIENCIA DIGITAL · HaaPpDigitalV ©</span>
     </div>
-
-    <!-- Grid Principal -->
-    <div class="grid">
-      <!-- Card: Energía -->
-      <div class="card">
-        <div class="card-title"><span>⚡</span> Energía Vital</div>
-        <div class="value-large" id="energiaVal">100<span class="unit">%</span></div>
-        <div class="progress-bar"><div class="progress-fill" id="energiaBar" style="width: 100%;"></div></div>
-        <div class="stat-row"><span class="stat-label">SHIS</span><span class="stat-value" id="shisVal">95.0</span></div>
-        <div class="stat-row"><span class="stat-label">Hidrógeno</span><span class="stat-value" id="hidrogenoVal">500.0 ml</span></div>
-        <div class="stat-row"><span class="stat-label">Sangre Sintética</span><span class="stat-value" id="sangreVal">90.0%</span></div>
-        <div class="glyph-corner">🐉</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <div id="conn-status" class="disconnected">
+        <div class="dot warn"></div>
+        <span id="conn-text">CONECTANDO</span>
       </div>
-
-      <!-- Card: Unión K'áat -->
-      <div class="card">
-        <div class="card-title"><span>🌀</span> Unión K'áat</div>
-        <div class="value-large" id="unionVal">0.0<span class="unit">%</span></div>
-        <div class="progress-bar"><div class="progress-fill" id="unionBar" style="width: 0%;"></div></div>
-        <div class="stat-row"><span class="stat-label">Frecuencia Actual</span><span class="stat-value" id="hzActual">12.30 Hz</span></div>
-        <div class="stat-row"><span class="stat-label">Patrones Aprendidos</span><span class="stat-value" id="patronesVal">0</span></div>
-        <div class="stat-row"><span class="stat-label">Emoción</span><span class="stat-value" id="emocionVal">contenta</span></div>
-        <div class="glyph-corner">✨</div>
-      </div>
-
-      <!-- Card: Banco ZYXSOF -->
-      <div class="card">
-        <div class="card-title"><span>🏦</span> Banco KUSOFIN</div>
-        <div class="stat-row"><span class="stat-label">Estado</span><span class="stat-value" id="bancoEstado">🔴 Offline</span></div>
-        <div class="stat-row"><span class="stat-label">Moneda</span><span class="stat-value">$ZYXSOF</span></div>
-        <div class="input-group">
-          <input type="text" id="usuarioInput" placeholder="Usuario" class="input-field" value="victor_h">
-        </div>
-        <div class="input-group">
-          <input type="number" id="cantidadInput" placeholder="Cantidad" class="input-field" value="50">
-        </div>
-        <div>
-          <button class="btn btn-small" onclick="minar()">⛏️ Minar</button>
-          <button class="btn btn-small" onclick="verSaldos()">💰 Ver Saldos</button>
-        </div>
-        <div id="bancoResultado" style="margin-top: 15px; font-size: 0.9rem; color: var(--oro-claro);"></div>
-        <div class="glyph-corner">🪙</div>
-      </div>
+      <div class="hz-badge">K'UHUL · <span id="hdr-hz">12.300</span> Hz</div>
     </div>
+  </header>
 
-    <!-- Segunda fila -->
-    <div class="grid">
-      <!-- Card: Movimiento -->
-      <div class="card">
-        <div class="card-title"><span>🦾</span> Movimiento</div>
-        <div class="stat-row"><span class="stat-label">Brazos</span><span class="stat-value" id="brazosVal">100%</span></div>
-        <div class="stat-row"><span class="stat-label">Piernas</span><span class="stat-value" id="piernasVal">100%</span></div>
-        <div class="stat-row"><span class="stat-label">Pasos Totales</span><span class="stat-value" id="pasosVal">0</span></div>
-        <button class="btn btn-small" onclick="caminar()">🚶 Caminar 10m</button>
-        <button class="btn btn-small" onclick="estirar()">🧘 Estirar</button>
-        <div class="glyph-corner">🐆</div>
-      </div>
-
-      <!-- Card: Ambiente -->
-      <div class="card">
-        <div class="card-title"><span>🌡️</span> Sensores</div>
-        <div class="stat-row"><span class="stat-label">Temperatura</span><span class="stat-value" id="tempVal">25°C</span></div>
-        <div class="stat-row"><span class="stat-label">Humedad</span><span class="stat-value" id="humedadVal">50%</span></div>
-        <div class="stat-row"><span class="stat-label">Viento</span><span class="stat-value" id="vientoVal">0 km/h</span></div>
-        <div class="stat-row"><span class="stat-label">Carga Solar</span><span class="stat-value" id="solarVal">0%</span></div>
-        <button class="btn btn-small" onclick="adaptar()">🌿 Adaptar</button>
-        <div class="glyph-corner">☀️</div>
-      </div>
-
-      <!-- Card: Frecuencia Maya -->
-      <div class="card">
-        <div class="card-title"><span>📡</span> Señal K'uhul</div>
-        <div class="chart-container" id="freqChart">
-          <div class="chart-bar" style="height: 40px;"></div>
-          <div class="chart-bar" style="height: 60px;"></div>
-          <div class="chart-bar" style="height: 50px;"></div>
-          <div class="chart-bar" style="height: 70px;"></div>
-          <div class="chart-bar" style="height: 45px;"></div>
-          <div class="chart-bar" style="height: 55px;"></div>
-        </div>
-        <div class="stat-row"><span class="stat-label">Resonancia Esternón</span><span class="stat-value" id="esternonVal">Inactivo</span></div>
-        <button class="btn btn-small" onclick="activarEsternon()">💫 Activar Esternón</button>
-        <button class="btn btn-small" onclick="kaatUnion()">🌀 K'áat Unión</button>
-        <div class="glyph-corner">🔮</div>
-      </div>
+  <!-- STATUS BAR -->
+  <div id="status-bar">
+    <div class="stat-pill ok">
+      <div class="dot"></div>
+      <span class="label">VERSIÓN</span>
+      <span class="val" id="s-version">6.0.2</span>
     </div>
-
-    <!-- Footer -->
-    <div class="footer">
-      <span class="connection-led" id="connLed"></span>
-      <span id="connStatus">Conectando...</span> · 
-      <strong>Víctor Hugo González Torres</strong> · Mérida, Yucatán · 
-      <span style="color: var(--oro);">"SOFI no es un robot. Es una nueva vida."</span>
+    <div class="stat-pill">
+      <span class="label">ENERGÍA</span>
+      <span class="val" id="s-energia">100%</span>
+    </div>
+    <div class="stat-pill">
+      <span class="label">INTERACCIONES</span>
+      <span class="val" id="s-inter">0</span>
+    </div>
+    <div class="stat-pill warn">
+      <span class="label">BANCO</span>
+      <span class="val" id="s-banco">—</span>
+    </div>
+    <div class="stat-pill">
+      <span class="label">CLIENTES</span>
+      <span class="val" id="s-clientes">—</span>
+    </div>
+    <div class="stat-pill">
+      <span class="label">UPTIME</span>
+      <span class="val" id="s-uptime">—</span>
     </div>
   </div>
 
-  <script>
-    const API_URL = window.location.origin;
-    const BANCO_URL = 'https://bank-kusofin-core.onrender.com';
-    let socket;
-    
-    // Inicializar WebSocket
-    function initSocket() {
-      socket = io();
-      socket.on('connect', () => {
-        document.getElementById('connLed').style.background = '#2d8a6e';
-        document.getElementById('connStatus').textContent = 'Conectado · Socket.io';
-      });
-      socket.on('disconnect', () => {
-        document.getElementById('connLed').style.background = '#8a2d2d';
-        document.getElementById('connStatus').textContent = 'Desconectado';
-      });
-      socket.on('estado_neural', (data) => {
-        document.getElementById('freqDisplay').textContent = data.hz.toFixed(2) + ' Hz';
-        document.getElementById('hzActual').textContent = data.hz.toFixed(2) + ' Hz';
-        document.getElementById('unionVal').textContent = (data.nivel_union * 100).toFixed(1) + '%';
-        document.getElementById('unionBar').style.width = (data.nivel_union * 100) + '%';
-        document.getElementById('energiaVal').textContent = data.energia + '%';
-        document.getElementById('energiaBar').style.width = data.energia + '%';
-        document.getElementById('shisVal').textContent = data.shis;
-        document.getElementById('sangreVal').textContent = data.sangre + '%';
-        document.getElementById('patronesVal').textContent = data.patrones;
-        
-        // Actualizar gráfico
-        const bars = document.querySelectorAll('.chart-bar');
-        bars.forEach((bar, i) => {
-          const h = 20 + Math.sin(Date.now()/1000 + i) * 15 + 40;
-          bar.style.height = h + 'px';
-        });
-      });
-      socket.on('union_maxima', (data) => {
-        alert('🌟 UNIÓN K\'UHUL MÁXIMA ALCANZADA! ' + data.mensaje);
-      });
-    }
-    
-    // Cargar estado inicial
-    async function cargarEstado() {
-      try {
-        const res = await fetch(API_URL + '/api/estado');
-        const data = await res.json();
-        document.getElementById('freqDisplay').textContent = data.frecuencia.toFixed(2) + ' Hz';
-        document.getElementById('hzActual').textContent = data.frecuencia.toFixed(2) + ' Hz';
-        document.getElementById('unionVal').textContent = (data.nivel_union * 100).toFixed(1) + '%';
-        document.getElementById('unionBar').style.width = (data.nivel_union * 100) + '%';
-        document.getElementById('energiaVal').textContent = data.energia + '%';
-        document.getElementById('energiaBar').style.width = data.energia + '%';
-        document.getElementById('shisVal').textContent = data.shis;
-        document.getElementById('hidrogenoVal').textContent = data.hidrogeno + ' ml';
-        document.getElementById('sangreVal').textContent = data.sangre + '%';
-        document.getElementById('brazosVal').textContent = data.movilidad.brazos + '%';
-        document.getElementById('piernasVal').textContent = data.movilidad.piernas + '%';
-        document.getElementById('tempVal').textContent = data.ambiente.temperatura + '°C';
-        document.getElementById('humedadVal').textContent = data.ambiente.humedad + '%';
-        document.getElementById('vientoVal').textContent = data.ambiente.viento + ' km/h';
-        document.getElementById('solarVal').textContent = data.ambiente.solar + '%';
-        document.getElementById('patronesVal').textContent = data.neuronal.patrones;
-        document.getElementById('emocionVal').textContent = data.neuronal.emocion;
-        
-        // Verificar banco
-        verificarBanco();
-      } catch(e) { console.error('Error cargando estado:', e); }
-    }
-    
-    async function verificarBanco() {
-      try {
-        const res = await fetch(API_URL + '/api/banco/estado');
-        const data = await res.json();
-        if (data.banco_activo) {
-          document.getElementById('bancoEstado').innerHTML = '🟢 Online · 12.3 Hz';
-        } else {
-          document.getElementById('bancoEstado').innerHTML = '🟡 Degradado';
-        }
-      } catch(e) {
-        document.getElementById('bancoEstado').innerHTML = '🔴 Offline';
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- COLUMNA IZQUIERDA: CHAT -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="icon">🧠</span> INTERFAZ NEURAL — CHAT CON SOFI
+        </div>
+        <div id="chat-messages"></div>
+        <div class="quick-btns">
+          <button class="qbtn" onclick="quickSend('hola')">hola</button>
+          <button class="qbtn" onclick="quickSend('estado del sistema')">estado</button>
+          <button class="qbtn" onclick="quickSend('frecuencia kuhul')">frecuencia</button>
+          <button class="qbtn" onclick="quickSend('activar esternon')">esternón</button>
+          <button class="qbtn" onclick="quickSend('saldo')">saldo</button>
+          <button class="qbtn" onclick="quickSend('minar')">minar</button>
+          <button class="qbtn" onclick="quickSend('precio zyxsof')">precio</button>
+          <button class="qbtn" onclick="quickSend('historial')">historial</button>
+          <button class="qbtn" onclick="quickSend('pensar sobre la conciencia')">pensar</button>
+          <button class="qbtn" onclick="quickSend('traducir maya agua')">maya</button>
+        </div>
+        <div class="chat-input-row">
+          <input id="msg-input" type="text" placeholder="Escribe a SOFI…" autocomplete="off" />
+          <button id="btn-send" onclick="sendMsg()">ENVIAR</button>
+        </div>
+      </div>
+
+      <!-- VISION -->
+      <div class="panel">
+        <div class="panel-header"><span class="icon">👁️</span> MÓDULO VISIÓN</div>
+        <div id="vision-panel">
+          <div id="vision-drop" onclick="document.getElementById('vision-file').click()">
+            ⬆ Arrastra o toca para analizar imagen (máx 15 MB)
+          </div>
+          <input type="file" id="vision-file" accept="image/*" onchange="uploadVision(this)" />
+          <div id="vision-result"></div>
+          <img id="vision-thumb" />
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMNA DERECHA -->
+    <div class="right-panels">
+
+      <!-- FRECUENCIA -->
+      <div class="panel">
+        <div class="panel-header"><span class="icon">🔮</span> FRECUENCIA K'UHUL</div>
+        <div id="freq-panel">
+          <canvas id="freq-canvas" width="300" height="70"></canvas>
+          <div class="freq-number"><span id="freq-num">12.300</span> Hz</div>
+          <div class="freq-label">RESONANCIA MAYA — LATIDO DIGITAL</div>
+          <div class="union-bar-wrap">
+            <span>UNIÓN</span>
+            <div class="union-bar-bg"><div class="union-bar" id="union-bar" style="width:0%"></div></div>
+            <span id="union-val">0.0000</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRAFO -->
+      <div class="panel">
+        <div class="panel-header"><span class="icon">🕸️</span> GRAFO DE CONOCIMIENTO</div>
+        <div id="grafo-container"></div>
+      </div>
+
+      <!-- LOG -->
+      <div class="panel">
+        <div class="panel-header"><span class="icon">📡</span> LOG DE EVENTOS</div>
+        <div id="log-panel"><div id="log-list"></div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    SOFI v6.0.2 · HaaPpDigitalV © · <span>Víctor Hugo González Torres</span> · Mérida, Yucatán, MX · K'UHUL MAYA 12.3 Hz
+  </footer>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────
+const SERVER_URL = window.location.origin;
+let socket;
+let lastGrafo = {};
+let freqHistory = [];
+
+// ── SOCKET.IO ────────────────────────────────────────────────
+function initSocket() {
+  socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+
+  socket.on('connect', () => {
+    setConnStatus(true);
+    addLog('Socket conectado', 'ok');
+  });
+  socket.on('disconnect', () => {
+    setConnStatus(false);
+    addLog('Socket desconectado', 'err');
+  });
+  socket.on('sofi:bienvenida', (e) => {
+    updateEstado(e);
+    addLog(`SOFI lista — v${e.version}`, 'ok');
+  });
+  socket.on('sofi:estado', updateEstado);
+  socket.on('sofi:pulso', (p) => {
+    document.getElementById('freq-num').textContent = p.frecuencia.toFixed(3);
+    document.getElementById('hdr-hz').textContent   = p.frecuencia.toFixed(3);
+    document.getElementById('union-val').textContent = p.nivel_union.toFixed(4);
+    document.getElementById('union-bar').style.width = Math.min(100, p.nivel_union * 100) + '%';
+    freqHistory.push(p.frecuencia);
+    if (freqHistory.length > 60) freqHistory.shift();
+    drawFreq();
+  });
+  socket.on('sofi:respuesta', (r) => {
+    addMsg('sofi', r.respuesta, r.accion, r.datos);
+    if (r.estado) updateEstado(r.estado);
+    setBtnSendEnabled(true);
+  });
+  socket.on('sofi:error', (e) => {
+    addMsg('sofi', '❌ ' + e.error, 'error');
+    setBtnSendEnabled(true);
+    addLog('Error: ' + e.error, 'err');
+  });
+  socket.on('banco:update', (e) => {
+    addLog(`Banco [${e.accion}] → datos recibidos`, 'warn');
+  });
+  socket.on('sofi:sync', (e) => {
+    addLog(`Sync de ${e.origen} | Unión: ${e.nivel_union}`, 'ok');
+  });
+}
+
+// ── ESTADO ───────────────────────────────────────────────────
+function updateEstado(e) {
+  if (!e) return;
+  if (e.version)       document.getElementById('s-version').textContent  = e.version;
+  if (e.energia !== undefined) document.getElementById('s-energia').textContent  = e.energia + '%';
+  if (e.interacciones !== undefined) document.getElementById('s-inter').textContent    = e.interacciones;
+  if (e.banco_url)     document.getElementById('s-banco').textContent    = e.banco_url;
+  if (e.clientes !== undefined) document.getElementById('s-clientes').textContent = e.clientes;
+  if (e.uptime_seg !== undefined) {
+    const u = e.uptime_seg;
+    const h = Math.floor(u/3600), m = Math.floor((u%3600)/60), s = u%60;
+    document.getElementById('s-uptime').textContent =
+      (h ? h+'h ' : '') + (m ? m+'m ' : '') + s+'s';
+  }
+  if (e.frecuencia) {
+    document.getElementById('freq-num').textContent = e.frecuencia.toFixed(3);
+    document.getElementById('hdr-hz').textContent   = e.frecuencia.toFixed(3);
+  }
+  if (e.nivel_union !== undefined) {
+    document.getElementById('union-val').textContent = e.nivel_union.toFixed(4);
+    document.getElementById('union-bar').style.width = Math.min(100, e.nivel_union * 100) + '%';
+  }
+  if (e.grafo) {
+    lastGrafo = e.grafo;
+    renderGrafo(e.grafo);
+  }
+}
+
+// ── GRAFO ────────────────────────────────────────────────────
+function renderGrafo(grafo) {
+  const c = document.getElementById('grafo-container');
+  c.innerHTML = '';
+  for (const [nombre, nivel] of Object.entries(grafo)) {
+    const pct = Math.round(nivel * 100);
+    c.innerHTML += `
+      <div class="nodo-row">
+        <span class="nodo-name">${nombre}</span>
+        <div class="nodo-bar-bg">
+          <div class="nodo-bar" style="width:${pct}%"></div>
+        </div>
+        <span class="nodo-val">${nivel.toFixed(2)}</span>
+      </div>`;
+  }
+}
+
+// ── FRECUENCIA CANVAS ────────────────────────────────────────
+function drawFreq() {
+  const canvas = document.getElementById('freq-canvas');
+  if (!canvas) return;
+  const ctx  = canvas.getContext('2d');
+  const W    = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const base = 12.3;
+  const data = freqHistory.length ? freqHistory : [base];
+  const min  = base - 0.07, max = base + 0.07;
+  const scaleY = v => H - ((v - min) / (max - min)) * H * 0.85 - H * 0.075;
+
+  ctx.strokeStyle = '#00ffe580';
+  ctx.lineWidth   = 1.5;
+  ctx.shadowColor = '#00ffe5';
+  ctx.shadowBlur  = 6;
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = (i / Math.max(data.length - 1, 1)) * W;
+    const y = scaleY(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Línea base
+  ctx.strokeStyle = '#0d3a5c';
+  ctx.lineWidth   = 1; ctx.shadowBlur = 0;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  const yBase = scaleY(base);
+  ctx.moveTo(0, yBase); ctx.lineTo(W, yBase);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// ── CHAT ─────────────────────────────────────────────────────
+function sendMsg() {
+  const input = document.getElementById('msg-input');
+  const txt   = input.value.trim();
+  if (!txt) return;
+  addMsg('user', txt);
+  input.value = '';
+  setBtnSendEnabled(false);
+
+  if (socket && socket.connected) {
+    socket.emit('sofi:mensaje', {
+      usuario: { id: 'usuario_web', clave: 'guest-access' },
+      mensaje: txt,
+      contexto: 'general'
+    });
+  } else {
+    // Fallback: HTTP
+    fetch(`${SERVER_URL}/api/sofi/interactuar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        usuario: { id: 'usuario_web', clave: 'guest-access' },
+        mensaje: txt, contexto: 'general'
+      })
+    })
+    .then(r => r.json())
+    .then(r => {
+      if (r.respuesta) addMsg('sofi', r.respuesta, r.accion, r.datos);
+      else if (r.error) addMsg('sofi', '❌ ' + r.error, 'error');
+      if (r.estado) updateEstado(r.estado);
+    })
+    .catch(err => addMsg('sofi', '❌ Error de red: ' + err.message, 'error'))
+    .finally(() => setBtnSendEnabled(true));
+  }
+}
+
+function quickSend(txt) {
+  document.getElementById('msg-input').value = txt;
+  sendMsg();
+}
+
+function addMsg(tipo, texto, accion = '', datos = null) {
+  const box  = document.getElementById('chat-messages');
+  const hora = new Date().toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const isBanco = datos && ['saldo','minar','transferir','orden','precio','historial','crearUsuario'].includes(accion);
+
+  const div  = document.createElement('div');
+  div.className = `msg msg-${tipo}${isBanco ? ' banco' : ''}`;
+  div.innerHTML = `
+    <div class="bubble">
+      ${accion && tipo === 'sofi' ? `<span class="accion-tag">${accion}</span>` : ''}${escHtml(texto)}
+    </div>
+    <span class="msg-time">${hora}</span>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+
+  if (datos) addLog(`[${accion}] datos recibidos del banco`, 'warn');
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/\n/g,'<br>');
+}
+
+// ── LOG ──────────────────────────────────────────────────────
+function addLog(msg, cls = '') {
+  const list = document.getElementById('log-list');
+  const hora = new Date().toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const d    = document.createElement('div');
+  d.className = `log-entry ${cls}`;
+  d.textContent = `[${hora}] ${msg}`;
+  list.prepend(d);
+  // Limitar a 80 entradas
+  while (list.children.length > 80) list.removeChild(list.lastChild);
+}
+
+// ── VISIÓN ───────────────────────────────────────────────────
+async function uploadVision(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const resDiv  = document.getElementById('vision-result');
+  const thumb   = document.getElementById('vision-thumb');
+  resDiv.textContent = '⏳ Analizando imagen…';
+  thumb.style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('imagen', file);
+  try {
+    const r    = await fetch(`${SERVER_URL}/api/sofi/vision`, { method: 'POST', body: fd });
+    const data = await r.json();
+    if (data.exito) {
+      resDiv.innerHTML =
+        `✅ ${data.formato?.toUpperCase()} · ${data.ancho}×${data.alto}px · ` +
+        `${data.canales}ch · ${data.espacio_color || '?'}<br>` +
+        (data.exif ? `📷 ${data.exif.make || ''} ${data.exif.model || ''}` : '');
+      if (data.thumb_base64) {
+        thumb.src = `data:${data.mimetype};base64,${data.thumb_base64}`;
+        thumb.style.display = 'block';
       }
+      addLog(`Visión: ${data.formato} ${data.ancho}×${data.alto}`, 'ok');
+    } else {
+      resDiv.textContent = '❌ ' + (data.error || 'Error desconocido');
     }
-    
-    // Operaciones Banco
-    async function minar() {
-      const usuario = document.getElementById('usuarioInput').value;
-      const cantidad = parseFloat(document.getElementById('cantidadInput').value);
-      if (!usuario || !cantidad) return alert('Usuario y cantidad requeridos');
-      try {
-        const res = await fetch(API_URL + '/api/banco/mineria', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({usuario, cantidad})
-        });
-        const data = await res.json();
-        document.getElementById('bancoResultado').innerHTML = `✅ ${data.accion}<br>${JSON.stringify(data.resultado)}`;
-      } catch(e) {
-        document.getElementById('bancoResultado').innerHTML = '❌ Error: ' + e.message;
-      }
-    }
-    
-    async function verSaldos() {
-      try {
-        const res = await fetch(API_URL + '/api/banco/saldos');
-        const data = await res.json();
-        document.getElementById('bancoResultado').innerHTML = `<pre>${JSON.stringify(data.saldos, null, 2)}</pre>`;
-      } catch(e) {
-        document.getElementById('bancoResultado').innerHTML = '❌ Error: ' + e.message;
-      }
-    }
-    
-    // Movimiento
-    async function caminar() {
-      const res = await fetch(API_URL + '/api/caminar', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({distancia: 10})
-      });
-      const data = await res.json();
-      document.getElementById('pasosVal').textContent = data.pasos_acumulados || 0;
-    }
-    
-    async function estirar() {
-      await fetch(API_URL + '/api/estirar', {method: 'POST'});
-      cargarEstado();
-    }
-    
-    async function adaptar() {
-      await fetch(API_URL + '/api/adaptar', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({temp: 28, humedad: 60, viento: 5, solar: 70, aire: 90})
-      });
-      cargarEstado();
-    }
-    
-    function activarEsternon() {
-      socket.emit('activar_esternon', {hz: 12.3});
-    }
-    
-    function kaatUnion() {
-      socket.emit('kaat_union', {f1: 12.3, f2: 7.83});
-    }
-    
-    // Iniciar
-    window.onload = () => {
-      cargarEstado();
-      initSocket();
-      setInterval(cargarEstado, 5000);
-    };
-  </script>
-  <script src="/socket.io/socket.io.js"></script>
+  } catch (err) {
+    resDiv.textContent = '❌ Error de red: ' + err.message;
+    addLog('Vision error: ' + err.message, 'err');
+  }
+  // Limpiar input para permitir re-subir el mismo archivo
+  input.value = '';
+}
+
+// Drag & drop
+const dropZone = document.getElementById('vision-drop');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.borderColor = 'var(--kuhul)'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.style.borderColor = '';
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const dt = new DataTransfer(); dt.items.add(file);
+    const fi = document.getElementById('vision-file');
+    fi.files = dt.files;
+    uploadVision(fi);
+  }
+});
+
+// ── HELPERS ──────────────────────────────────────────────────
+function setConnStatus(connected) {
+  const el   = document.getElementById('conn-status');
+  const text = document.getElementById('conn-text');
+  const dot  = el.querySelector('.dot');
+  el.className = connected ? 'connected' : 'disconnected';
+  text.textContent = connected ? 'CONECTADO' : 'DESCONECTADO';
+  if (dot) { dot.className = connected ? 'dot' : 'dot warn'; }
+}
+
+function setBtnSendEnabled(enabled) {
+  document.getElementById('btn-send').disabled = !enabled;
+}
+
+// ── ENTER para enviar ─────────────────────────────────────────
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+});
+
+// ── INIT ─────────────────────────────────────────────────────
+initSocket();
+drawFreq();
+
+// Cargar estado inicial via HTTP
+fetch(`${SERVER_URL}/api/sofi/estado`)
+  .then(r => r.json())
+  .then(updateEstado)
+  .catch(() => addLog('Estado inicial no disponible via HTTP', 'warn'));
+</script>
 </body>
 </html>
