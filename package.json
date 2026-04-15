@@ -47,6 +47,7 @@
     "helmet": "^7.1.0",
     "rate-limiter-flexible": "^5.0.3",
     "node-cache": "^5.1.2"
+  "gpu.js": "^1.5.0",  
   },
   "devDependencies": {
     "nodemon": "^3.1.4",
