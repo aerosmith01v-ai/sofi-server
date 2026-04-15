@@ -1212,7 +1212,78 @@ io.on('connection', socket => {
     clientes_socket = Math.max(0, clientes_socket - 1);
     console.log(`🔌 Cliente desconectado. Total: ${clientes_socket}`);
   });
-});
+// ══════════════════════════════════════════════════════════════
+//  INTEGRACIÓN ModuloAtaque en server.js
+//  Agrega estas líneas en los lugares indicados
+// ══════════════════════════════════════════════════════════════
+
+// ── 1. AL INICIO del server.js (después de los requires) ──
+const ModuloAtaque = require('./ModuloAtaque');
+
+// ── 2. DENTRO de la clase SOFI, en el constructor ──
+// Después de:  this.ingresos = new ModuloIngresos();
+// Agrega:
+this.ataque = new ModuloAtaque(this.trading, this.ingresos);
+
+// ── 3. DENTRO de estado_completo() ──
+// Agrega en el return:
+ataque: this.ataque.estado(),
+
+// ── 4. EN MotorInteligencia._patrones, agrega estos patrones ──
+{ test: t => /\b(activar ataque|modo ataque|ataque|offensive)\b/.test(t),        accion: 'activarAtaque' },
+{ test: t => /\b(modo ultra|ultra ataque|ultra)\b/.test(t),                      accion: 'activarUltra' },
+{ test: t => /\b(desactivar ataque|detener ataque|modo normal)\b/.test(t),        accion: 'desactivarAtaque' },
+{ test: t => /\b(ejecutar ataque|atacar|operar|ejecutar|auto trading)\b/.test(t), accion: 'ejecutarAtaque' },
+{ test: t => /\b(escanear|escaneo|predecir todo|prediccion|scan)\b/.test(t),      accion: 'escanear' },
+{ test: t => /\b(estado ataque|reporte ataque)\b/.test(t),                        accion: 'estadoAtaque' },
+
+// ── 5. EN MotorInteligencia._ejecutar(), agrega estos casos ──
+
+case 'activarAtaque': {
+  const res = this.sofi.ataque.activar('ATAQUE');
+  return this._resp(res.mensaje, accion, res);
+}
+
+case 'activarUltra': {
+  const res = this.sofi.ataque.activar('ULTRA');
+  return this._resp(`🔥 ${res.mensaje}`, accion, res);
+}
+
+case 'desactivarAtaque': {
+  const res = this.sofi.ataque.desactivar();
+  return this._resp(res.mensaje, accion, res);
+}
+
+case 'ejecutarAtaque': {
+  const res = this.sofi.ataque.ejecutarAtaque(frecuencia_actual);
+  const txt = res.error ? `⚠️ ${res.error}`
+    : `⚔️ Ciclo ${res.ciclo} [${res.modo}] @ ${res.hz} Hz\n` +
+      `Operaciones: ${res.operaciones_ejecutadas} | Ganancia: +${res.ganancia_ciclo} $ZYXSOF\n` +
+      `Total acumulado: ${res.ganancias_totales} $ZYXSOF\n` +
+      `Top señales:\n${res.top_predicciones.join('\n')}`;
+  return this._resp(txt, accion, res);
+}
+
+case 'escanear': {
+  const preds = this.sofi.ataque.escanearTodo(frecuencia_actual);
+  const txt   = `📡 Escaneo completo [${preds.length} activos] @ ${frecuencia_actual.toFixed(3)} Hz:\n` +
+    preds.map(p => `${p.activo}: ${p.señal} [${p.fase}] conf:${p.confianza}`).join('\n');
+  return this._resp(txt, accion, preds);
+}
+
+case 'estadoAtaque': {
+  const est = this.sofi.ataque.estado();
+  const txt = `⚔️ Modo: ${est.modo} | Ciclos: ${est.ciclos_ataque} | ` +
+    `Ganancias: ${est.ganancias_ataque} $ZYXSOF | Ops: ${est.operaciones_total}`;
+  return this._resp(txt, accion, est);
+}
+
+// ── 6. EN el setInterval del pulso K'uhul (cada 5s) ──
+// Agrega después de sofi.ingresos.generarIngreso('frecuencia'):
+if (sofi.ataque && sofi.ataque.activo) {
+  const res = sofi.ataque.ejecutarAtaque(frecuencia_actual);
+  io.emit('sofi:ataque', res);
+}
 
 // ══════════════════════════════════════════════════════════════
 //  PULSO K'UHUL — cada 5s
