@@ -1,25 +1,66 @@
 {
-  "name": "sofi-node",
-  "version": "6.1.0",
-  "description": "SOFI — Sistema Operativo de Frecuencia Inteligente · HaaPpDigitalV © · K'uhul 12.3 Hz",
+  "name": "sofi-sistema-operativo-conciencia-digital",
+  "version": "6.2.0",
+  "description": "SOFI - Sistema Operativo de Conciencia Digital · K'uhul Maya 12.3 Hz · HaaPpDigitalV",
   "main": "server.js",
-  "engines": {
-  "node": "18.x"
-  },
+  "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "nodemon server.js",
+    "test": "node --test",
+    "lint": "eslint .",
+    "production": "NODE_ENV=production node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "ai",
+    "consciousness",
+    "neural-network",
+    "trading",
+    "frequency",
+    "kuhul",
+    "maya",
+    "blockchain",
+    "sofi"
+  ],
+  "author": "Víctor Hugo González Torres (Osiris) <haappdigitalv@gmail.com>",
+  "license": "INDAUTOR-MX-2025",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/estigia920-bit/sofi-server.git"
   },
   "dependencies": {
-    "brain.js": "^1.6.1",
+    "express": "^4.19.2",
     "cors": "^2.8.5",
-    "exifr": "^7.1.3",
-    "express": "^4.18.2",
+    "socket.io": "^4.7.5",
+    "brain.js": "^2.0.0-beta.24",
     "multer": "^1.4.5-lts.1",
-    "sharp": "^0.33.4",
-    "socket.io": "^4.7.5"
+    "sharp": "^0.33.5",
+    "exifr": "^7.1.3",
+    "ws": "^8.18.0",
+    "uuid": "^10.0.0",
+    "dotenv": "^16.4.5",
+    "compression": "^1.7.4",
+    "helmet": "^7.1.0",
+    "rate-limiter-flexible": "^5.0.3",
+    "node-cache": "^5.1.2"
   },
-  "keywords": ["sofi", "kuhul", "maya", "ia", "haappdigitalv"],
-  "author": "Víctor Hugo González Torres · Mérida, Yucatán, MX",
-  "license": "UNLICENSED"
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "eslint": "^9.9.1"
+  },
+  "nodemonConfig": {
+    "watch": [
+      "server.js",
+      "ModuloAtaque.js"
+    ],
+    "ext": "js,json",
+    "ignore": [
+      "node_modules/",
+      "public/"
+    ]
+  }
 }
