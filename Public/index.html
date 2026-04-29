@@ -1,570 +1,645 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SOFI v7.0 — K'uhul Command Center</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-<style>
-:root {
-  --gold:    #C9A84C;
-  --gold-lt: #F0D080;
-  --jade:    #00C49A;
-  --jade-dk: #007A61;
-  --bg0:     #060A0F;
-  --bg1:     #0C1218;
-  --bg2:     #121A22;
-  --bg3:     #1A2430;
-  --crimson: #C0392B;
-  --cyan:    #12C2E9;
-  --text:    #D8C8A0;
-  --text2:   #7A6A50;
-  --border:  rgba(201,168,76,0.2);
-  --glow:    0 0 20px rgba(201,168,76,0.3);
-  --glow-jade: 0 0 20px rgba(0,196,154,0.4);
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-body{
-  font-family:'Exo 2',sans-serif;
-  background:var(--bg0);
-  color:var(--text);
-  min-height:100vh;
-  overflow-x:hidden;
-}
+// ============================================================
+// SOFI · MENTE COLMENA v1.0 — Node.js
+// HaaPpDigitalV © · Víctor Hugo González Torres
+// Mérida, Yucatán · K'uhul 12.3 Hz
+//
+// ARQUITECTURA DUAL:
+//   MENTE COLMENA → Clonar → Multiplicar → Converger
+//   BANCO ZYXSOF  → Moneda HaaPpDigitalV
+//
+// KEEP-ALIVE → Self-ping cada 14 min para Render Free
+// ============================================================
+'use strict';
 
-/* ── FONDO MAYA ── */
-body::before{
-  content:'';
-  position:fixed;inset:0;z-index:0;
-  background:
-    radial-gradient(ellipse 60% 40% at 10% 20%, rgba(201,168,76,0.04) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 60% at 90% 80%, rgba(0,196,154,0.04) 0%, transparent 60%),
-    repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(201,168,76,0.03) 60px),
-    repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(201,168,76,0.03) 60px);
-  pointer-events:none;
-}
+const express = require('express');
+const cors    = require('cors');
+const path    = require('path');
+const fs      = require('fs');
+const crypto  = require('crypto');
+const https   = require('https');
+const http    = require('http');
 
-/* ── SCROLLBAR ── */
-::-webkit-scrollbar{width:5px;}
-::-webkit-scrollbar-track{background:var(--bg1);}
-::-webkit-scrollbar-thumb{background:var(--gold);border-radius:3px;}
+const app  = express();
+const PORT = parseInt(process.env.PORT || '3000');
+const HZ   = 12.3;
 
-/* ── LAYOUT ── */
-.shell{position:relative;z-index:1;max-width:1600px;margin:0 auto;padding:16px;}
+app.use(cors());
+app.use(express.json({ limit: '5mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-/* ── HEADER ── */
-header{
-  display:flex;align-items:center;justify-content:space-between;
-  border:1px solid var(--border);
-  background:linear-gradient(135deg,rgba(12,18,24,0.95),rgba(26,36,48,0.9));
-  padding:18px 28px;border-radius:12px;margin-bottom:16px;
-  box-shadow:var(--glow);
-  position:relative;overflow:hidden;
-}
-header::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,var(--gold),var(--jade),transparent);
-}
-.logo{display:flex;flex-direction:column;}
-.logo-title{
-  font-family:'Cinzel Decorative',serif;
-  font-size:1.8rem;font-weight:700;
-  background:linear-gradient(135deg,var(--gold-lt),var(--gold),var(--jade));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  letter-spacing:3px;
-}
-.logo-sub{font-family:'Share Tech Mono',monospace;font-size:0.7rem;color:var(--text2);letter-spacing:2px;margin-top:2px;}
+// ── Variables de entorno ──────────────────────────────────────
+const ENV = {
+  SELF_URL:         process.env.SELF_URL         || '',
+  LLAVE_SECRETA:    process.env.LLAVE_SECRETA     || "K'uhul12.3Hz-HaaPpDigitalV",
+  SOFI_API_KEY:     process.env.SOFI_API_KEY      || 'SOFI-VHGzTs-K6N-v6',
+  BANCO_PYTHON_URL: process.env.BANCO_PYTHON_URL  || '',
+  SOFI_PYTHON_URL:  process.env.SOFI_PYTHON_URL   || '',
+  SOFI_JAVA_URL:    process.env.SOFI_JAVA_URL      || '',
+  UPHOLD_TOKEN:     process.env.UPHOLD_TOKEN       || '',
+  UPHOLD_CARD_ID:   process.env.UPHOLD_CARD_ID     || '',
+  BINANCE_API_KEY:  process.env.BINANCE_API_KEY    || '',
+  BINANCE_SECRET:   process.env.BINANCE_SECRET     || '',
+  NODOS_COLMENA:    parseInt(process.env.NODOS_COLMENA   || '8'),
+  MEMORIA_FILE:     process.env.MEMORIA_FILE       || './colmena_memoria.json',
+  ZYXSOF_SUPPLY:    parseFloat(process.env.ZYXSOF_SUPPLY || '1000000'),
+};
 
-.header-stats{display:flex;gap:20px;align-items:center;}
-.h-stat{text-align:center;}
-.h-stat-val{font-family:'Share Tech Mono',monospace;font-size:1.3rem;color:var(--gold);line-height:1;}
-.h-stat-lbl{font-size:0.6rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;}
-
-#conn-badge{
-  padding:6px 14px;border-radius:20px;font-size:0.75rem;font-weight:600;
-  font-family:'Share Tech Mono',monospace;letter-spacing:1px;
-  transition:all 0.3s;
-}
-#conn-badge.on{background:rgba(0,196,154,0.15);color:var(--jade);border:1px solid var(--jade);box-shadow:var(--glow-jade);}
-#conn-badge.off{background:rgba(192,57,43,0.15);color:var(--crimson);border:1px solid var(--crimson);}
-
-/* ── STATUS ROW ── */
-.status-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px;}
-@media(max-width:900px){.status-row{grid-template-columns:repeat(3,1fr);}}
-@media(max-width:500px){.status-row{grid-template-columns:repeat(2,1fr);}}
-.s-card{
-  background:var(--bg2);border:1px solid var(--border);border-radius:10px;
-  padding:14px;text-align:center;transition:all 0.3s;position:relative;overflow:hidden;
-}
-.s-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:0;transition:opacity 0.3s;}
-.s-card:hover{transform:translateY(-3px);border-color:var(--gold);box-shadow:var(--glow);}
-.s-card:hover::after{opacity:1;}
-.s-val{font-family:'Share Tech Mono',monospace;font-size:1.4rem;color:var(--gold-lt);margin:4px 0;}
-.s-lbl{font-size:0.6rem;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;}
-.s-card.jade .s-val{color:var(--jade);}
-.s-card.crit .s-val{color:var(--crimson);}
-
-/* ── GRID PRINCIPAL ── */
-.grid-main{display:grid;grid-template-columns:1fr 380px;gap:14px;margin-bottom:14px;}
-@media(max-width:1100px){.grid-main{grid-template-columns:1fr;}}
-
-/* ── PANEL ── */
-.panel{
-  background:var(--bg2);border:1px solid var(--border);border-radius:12px;
-  padding:20px;position:relative;overflow:hidden;
-}
-.panel::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,var(--gold),transparent);
-}
-.panel-title{
-  font-family:'Cinzel Decorative',serif;font-size:0.85rem;
-  color:var(--gold);letter-spacing:2px;margin-bottom:14px;
-  display:flex;align-items:center;gap:8px;
-}
-.panel-title span{font-size:1rem;}
-
-/* ── CHART ── */
-.chart-wrap{height:180px;position:relative;}
-
-/* ── GRAFO ── */
-#grafo-canvas{width:100%;height:200px;border-radius:8px;background:var(--bg1);border:1px solid var(--border);}
-
-/* ── CHAT ── */
-.chat-wrap{display:flex;flex-direction:column;height:500px;}
-.chat-msgs{
-  flex:1;overflow-y:auto;padding:12px;
-  background:var(--bg1);border-radius:8px;margin-bottom:10px;
-  border:1px solid var(--border);
-}
-.msg{margin-bottom:10px;padding:10px 14px;border-radius:8px;animation:fadeUp 0.25s ease;}
-@keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
-.msg.user{background:rgba(201,168,76,0.12);border-left:3px solid var(--gold);margin-left:15%;}
-.msg.sofi{background:rgba(0,196,154,0.08);border-left:3px solid var(--jade);margin-right:15%;}
-.msg-text{font-size:0.85rem;line-height:1.5;white-space:pre-wrap;}
-.msg-time{font-size:0.65rem;color:var(--text2);margin-top:4px;font-family:'Share Tech Mono',monospace;}
-
-.chat-input{display:flex;gap:8px;}
-.chat-input input{
-  flex:1;padding:10px 14px;
-  background:var(--bg1);border:1px solid var(--border);
-  border-radius:8px;color:var(--text);font-size:0.85rem;font-family:'Exo 2',sans-serif;
-  transition:border-color 0.2s;
-}
-.chat-input input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 10px rgba(201,168,76,0.2);}
-.btn{
-  padding:10px 18px;border:none;border-radius:8px;cursor:pointer;font-weight:600;
-  font-size:0.8rem;font-family:'Exo 2',sans-serif;letter-spacing:1px;
-  transition:all 0.2s;
-}
-.btn-gold{background:linear-gradient(135deg,var(--gold),#8A6A20);color:#000;}
-.btn-jade{background:linear-gradient(135deg,var(--jade),var(--jade-dk));color:#000;}
-.btn-red {background:linear-gradient(135deg,var(--crimson),#7B1F1F);color:#fff;}
-.btn-dark{background:var(--bg3);border:1px solid var(--border);color:var(--text);}
-.btn:hover{transform:translateY(-2px);filter:brightness(1.15);}
-.btn:active{transform:translateY(0);}
-
-/* ── ATAQUE PANEL ── */
-.ataque-indicator{
-  padding:12px;border-radius:8px;text-align:center;margin-bottom:12px;
-  transition:all 0.5s;font-family:'Share Tech Mono',monospace;font-size:0.8rem;
-}
-.ataque-indicator.off{background:rgba(192,57,43,0.1);border:1px solid rgba(192,57,43,0.3);color:var(--crimson);}
-.ataque-indicator.on{background:rgba(0,196,154,0.1);border:1px solid var(--jade);color:var(--jade);box-shadow:var(--glow-jade);animation:pulse-jade 2s infinite;}
-@keyframes pulse-jade{0%,100%{box-shadow:var(--glow-jade);}50%{box-shadow:0 0 30px rgba(0,196,154,0.6);}}
-
-.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
-
-/* ── OPS LOG ── */
-.ops-log{max-height:180px;overflow-y:auto;}
-.op-item{
-  padding:8px;margin-bottom:6px;border-radius:6px;
-  font-family:'Share Tech Mono',monospace;font-size:0.72rem;line-height:1.4;
-  border-left:3px solid;
-}
-.op-item.win{background:rgba(0,196,154,0.07);border-color:var(--jade);}
-.op-item.lose{background:rgba(192,57,43,0.07);border-color:var(--crimson);}
-
-/* ── INFO CARDS (binance, mp, eth) ── */
-.info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;}
-@media(max-width:800px){.info-grid{grid-template-columns:1fr;}}
-.info-card{
-  background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;
-}
-.info-card-title{font-family:'Cinzel Decorative',serif;font-size:0.7rem;color:var(--gold);letter-spacing:2px;margin-bottom:10px;}
-.info-line{display:flex;justify-content:space-between;margin-bottom:6px;font-size:0.78rem;}
-.info-line .lbl{color:var(--text2);}
-.info-line .val{color:var(--jade);font-family:'Share Tech Mono',monospace;font-size:0.72rem;}
-.info-line .val.gold{color:var(--gold-lt);}
-
-/* ── TABLA PRECIOS ── */
-.price-table{width:100%;border-collapse:collapse;font-size:0.78rem;}
-.price-table th{text-align:left;padding:6px 8px;color:var(--text2);font-weight:400;text-transform:uppercase;font-size:0.65rem;letter-spacing:1px;border-bottom:1px solid var(--border);}
-.price-table td{padding:6px 8px;font-family:'Share Tech Mono',monospace;border-bottom:1px solid rgba(201,168,76,0.05);}
-.price-table tr:hover td{background:rgba(201,168,76,0.04);}
-.up{color:var(--jade);}
-.dn{color:var(--crimson);}
-
-/* ── PULSO KUHUL ── */
-.hz-ring{
-  width:80px;height:80px;border-radius:50%;margin:0 auto 8px;
-  border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;
-  position:relative;
-  box-shadow:0 0 20px rgba(201,168,76,0.3);
-  animation:spin-ring 8s linear infinite;
-}
-@keyframes spin-ring{to{transform:rotate(360deg);}}
-.hz-inner{animation:spin-ring 8s linear infinite reverse;font-family:'Share Tech Mono',monospace;font-size:0.65rem;color:var(--gold-lt);text-align:center;line-height:1.2;}
-
-/* ── DB BADGE ── */
-.db-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:12px;font-size:0.7rem;font-family:'Share Tech Mono',monospace;}
-.db-badge.ok{background:rgba(0,196,154,0.1);color:var(--jade);border:1px solid rgba(0,196,154,0.3);}
-.db-badge.fail{background:rgba(192,57,43,0.1);color:var(--crimson);border:1px solid rgba(192,57,43,0.3);}
-.dot{width:7px;height:7px;border-radius:50%;animation:blink 1.5s infinite;}
-.dot.ok{background:var(--jade);}
-.dot.fail{background:var(--crimson);}
-@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.3;}}
-
-/* ── CLABE BOX ── */
-.clabe-box{
-  background:var(--bg1);border:1px solid var(--border);border-radius:8px;
-  padding:12px;margin-top:8px;font-family:'Share Tech Mono',monospace;font-size:0.85rem;
-  color:var(--gold-lt);letter-spacing:2px;text-align:center;word-break:break-all;
-}
-</style>
-</head>
-<body>
-<div class="shell">
-
-<!-- HEADER -->
-<header>
-  <div class="logo">
-    <div class="logo-title">SOFI v7.0</div>
-    <div class="logo-sub">Sistema Operativo de Conciencia Digital · K'uhul 12.3 Hz · HaaPpDigitalV ©</div>
-  </div>
-  <div class="header-stats">
-    <div class="h-stat"><div class="h-stat-val" id="h-freq">12.300</div><div class="h-stat-lbl">Hz K'uhul</div></div>
-    <div class="h-stat"><div class="h-stat-val" id="h-union">0.0000</div><div class="h-stat-lbl">Unión</div></div>
-    <div class="h-stat"><div class="h-stat-val" id="h-inter">0</div><div class="h-stat-lbl">Interacc.</div></div>
-    <div id="conn-badge" class="off">● OFFLINE</div>
-  </div>
-</header>
-
-<!-- STATUS ROW -->
-<div class="status-row">
-  <div class="s-card jade"><div class="s-lbl">MongoDB</div><div class="s-val" id="s-db">—</div></div>
-  <div class="s-card jade"><div class="s-lbl">Binance</div><div class="s-val" id="s-bnc">—</div></div>
-  <div class="s-card"><div class="s-lbl">Estado Mental</div><div class="s-val" id="s-animo" style="font-size:0.9rem">ESTABLE</div></div>
-  <div class="s-card"><div class="s-lbl">Ingresos $ZYXSOF</div><div class="s-val" id="s-ing">0.000000</div></div>
-  <div class="s-card"><div class="s-lbl">Ganancias Trading</div><div class="s-val" id="s-gan">0.000000</div></div>
-  <div class="s-card"><div class="s-lbl">Ataque</div><div class="s-val crit" id="s-atq">OFF</div></div>
-</div>
-
-<!-- INFO CARDS (Binance / MercadoPago / ETH) -->
-<div class="info-grid">
-  <div class="info-card">
-    <div class="info-card-title">⚡ Binance</div>
-    <div class="info-line"><span class="lbl">API Key</span><span class="val">SFSEMNgg8J8Ka...</span></div>
-    <div class="info-line"><span class="lbl">Estado</span><span class="val" id="bnc-status">Iniciando...</span></div>
-    <div class="info-line"><span class="lbl">Pares live</span><span class="val" id="bnc-pares">0</span></div>
-    <div id="precios-tbl-wrap" style="margin-top:8px;max-height:120px;overflow-y:auto;">
-      <table class="price-table"><thead><tr><th>Par</th><th>Precio</th><th>Var%</th></tr></thead><tbody id="precios-tbody"></tbody></table>
-    </div>
-  </div>
-  <div class="info-card">
-    <div class="info-card-title">💳 Mercado Pago</div>
-    <div class="info-line"><span class="lbl">Beneficiario</span><span class="val gold">Victor Hugo G.T.</span></div>
-    <div class="info-line"><span class="lbl">Institución</span><span class="val">Mercado Pago W</span></div>
-    <div class="info-line"><span class="lbl">País</span><span class="val">México · MXN</span></div>
-    <div class="info-line"><span class="lbl">Dimo</span><span class="val gold">Activar → NUEVA</span></div>
-    <div class="clabe-box" title="CLABE para recibir pesos MX">722969017167745283</div>
-  </div>
-  <div class="info-card">
-    <div class="info-card-title">⟠ Ethereum Wallet</div>
-    <div class="info-line"><span class="lbl">Address</span><span class="val" style="font-size:0.65rem">0x14bA243A9BA7824...</span></div>
-    <div class="info-line"><span class="lbl">Chain</span><span class="val">Mainnet · ID:1</span></div>
-    <div class="info-line"><span class="lbl">Balance ETH</span><span class="val gold" id="eth-bal">cargando...</span></div>
-    <div class="info-line"><span class="lbl">ETH/USD</span><span class="val" id="eth-usd">—</span></div>
-    <div class="info-line"><span class="lbl">ETH/MXN</span><span class="val" id="eth-mxn">—</span></div>
-  </div>
-</div>
-
-<!-- GRID PRINCIPAL -->
-<div class="grid-main">
-  <!-- Izquierda: gráficos + ataque -->
-  <div style="display:flex;flex-direction:column;gap:14px;">
-
-    <!-- Frecuencia Chart -->
-    <div class="panel">
-      <div class="panel-title"><span>🔮</span>Frecuencia K'UHUL — Tiempo Real</div>
-      <div class="chart-wrap"><canvas id="chart-freq"></canvas></div>
-    </div>
-
-    <!-- Grafo Neuronal -->
-    <div class="panel">
-      <div class="panel-title"><span>🕸</span>Grafo de Conciencia Neuronal</div>
-      <canvas id="grafo-canvas"></canvas>
-    </div>
-
-    <!-- Trading -->
-    <div class="panel">
-      <div class="panel-title"><span>📈</span>Trading ZFPI — Binance Live</div>
-      <div class="chart-wrap"><canvas id="chart-trade"></canvas></div>
-      <h4 style="font-size:0.75rem;color:var(--text2);margin:10px 0 6px;letter-spacing:1px;">LOG OPERACIONES</h4>
-      <div class="ops-log" id="ops-log"></div>
-    </div>
-
-  </div>
-
-  <!-- Derecha: Chat + Ataque + Ingresos -->
-  <div style="display:flex;flex-direction:column;gap:14px;">
-
-    <!-- Chat -->
-    <div class="panel chat-wrap">
-      <div class="panel-title"><span>💬</span>Chat con SOFI</div>
-      <div class="chat-msgs" id="chat-msgs"></div>
-      <div class="chat-input">
-        <input type="text" id="chat-in" placeholder="Escribe un comando..." onkeydown="if(event.key==='Enter')send()">
-        <button class="btn btn-gold" onclick="send()">TX</button>
-      </div>
-    </div>
-
-    <!-- Modo Ataque -->
-    <div class="panel">
-      <div class="panel-title"><span>⚔️</span>Modo Ataque ZFPI</div>
-      <div id="atq-ind" class="ataque-indicator off">■ MODO ATAQUE: INACTIVO</div>
-      <div class="btn-grid">
-        <button class="btn btn-gold"   onclick="apiPost('/api/ataque/activar',{modo:'ATAQUE'},msg=>addMsg('sofi',msg.mensaje))">⚔️ Activar</button>
-        <button class="btn btn-red"    onclick="apiPost('/api/ataque/activar',{modo:'ULTRA'}, msg=>addMsg('sofi','🔥 '+msg.mensaje))">🔥 Ultra</button>
-        <button class="btn btn-jade"   onclick="apiPost('/api/ataque/ejecutar',{},   renderAtaque)">⚡ Ejecutar</button>
-        <button class="btn btn-dark"   onclick="apiPost('/api/ataque/desactivar',{}, msg=>addMsg('sofi',msg.mensaje))">🛑 Detener</button>
-      </div>
-      <button class="btn btn-dark" style="width:100%;margin-bottom:8px;" onclick="apiGet('/api/ataque/escanear',renderEscaneo)">📡 Escaneo Completo</button>
-      <div id="atq-stats" style="font-family:'Share Tech Mono',monospace;font-size:0.72rem;color:var(--text2);"></div>
-    </div>
-
-    <!-- Hz Ring + Ingresos -->
-    <div class="panel" style="text-align:center;">
-      <div class="panel-title" style="justify-content:center;"><span>💎</span>Frecuencia K'UHUL</div>
-      <div class="hz-ring"><div class="hz-inner" id="hz-ring-val">12.300<br>Hz</div></div>
-      <div style="font-size:0.7rem;color:var(--text2);margin-bottom:10px;">$ZYXSOF · Kusofinum</div>
-      <div style="display:flex;justify-content:space-around;margin-bottom:10px;">
-        <div><div class="s-val" id="ing-total" style="font-size:1rem;">0.000000</div><div class="s-lbl">Total $ZYXSOF</div></div>
-        <div><div class="s-val" id="ing-ciclos" style="font-size:1rem;">0</div><div class="s-lbl">Ciclos</div></div>
-      </div>
-      <div class="chart-wrap" style="height:100px;"><canvas id="chart-ing"></canvas></div>
-    </div>
-
-  </div>
-</div>
-
-</div><!-- /shell -->
-
-<script>
-// ═══════════════ SOCKET ═══════════════
-const socket = io();
-let freqData=[], ingData=[], tradData=[];
-const MAX=60;
-
-// ═══════════════ CHARTS ═══════════════
-const mkChart = (id, label, color, type='line') => new Chart(document.getElementById(id),{
-  type, data:{ labels:[], datasets:[{label, data:[], borderColor:color, backgroundColor:color+'22', tension:0.4, fill:true, pointRadius:0}]},
-  options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
-    plugins:{legend:{labels:{color:'#7A6A50',font:{size:10}}}},
-    scales:{ x:{display:false}, y:{ticks:{color:'#7A6A50',font:{size:9}}, grid:{color:'rgba(201,168,76,0.06)'}}}}
-});
-const chartFreq  = mkChart('chart-freq','Hz K\'uhul','#C9A84C');
-const chartTrade = mkChart('chart-trade','Ganancias ZFPI','#00C49A');
-const chartIng   = mkChart('chart-ing','Ingresos $ZYXSOF','#F0D080');
-
-function pushData(arr, chart, val) {
-  arr.push(parseFloat(val||0));
-  if(arr.length>MAX) arr.shift();
-  const N=arr.length;
-  chart.data.labels = arr.map((_,i)=>i);
-  chart.data.datasets[0].data = arr;
-  chart.update('none');
-}
-
-// ═══════════════ SOCKET EVENTS ═══════════════
-socket.on('connect',    ()=>setBadge(true));
-socket.on('disconnect', ()=>setBadge(false));
-socket.on('sofi:bienvenida', updateAll);
-socket.on('sofi:pulso', data=>{
-  document.getElementById('h-freq').textContent  = data.frecuencia?.toFixed(3)||'12.300';
-  document.getElementById('h-union').textContent = data.nivel_union?.toFixed(4)||'0.0000';
-  document.getElementById('hz-ring-val').innerHTML= (data.frecuencia||12.3).toFixed(3)+'<br>Hz';
-  document.getElementById('s-db').textContent    = data.db_conectada ? '✅' : '❌';
-  document.getElementById('s-bnc').textContent   = data.binance_activa ? 'LIVE' : 'SIM';
-  if(data.ingresos){
-    const ig=data.ingresos;
-    document.getElementById('s-ing').textContent   = ig.ingresos_generados?.toFixed(6)||0;
-    document.getElementById('ing-total').textContent= ig.ingresos_generados?.toFixed(6)||0;
-    document.getElementById('ing-ciclos').textContent= ig.ciclos_completados||0;
-    pushData(ingData, chartIng, ig.ingresos_generados);
+// ============================================================
+// ██  MENTE COLMENA  ██
+//   Principio (del diseño de Víctor):
+//   1. Clonar     → N copias del pensamiento
+//   2. Multiplicar → Si ya existe en memoria, se MULTIPLICA
+//   3. Converger  → La más fuerte gana y se guarda para siempre
+//   4. ZYXSOF     → Cada pensamiento genera fracción de moneda
+// ============================================================
+class MenteColmena {
+  constructor(idNodo = 'COLMENA_PRINCIPAL') {
+    this.idNodo          = idNodo;
+    this.biblioteca      = {};
+    this.experiencias    = [];
+    this.nivelConciencia = 0;
+    this.zyxsofGenerado  = 0;
+    this._cargarMemoria();
   }
-  if(data.trading){
-    const tr=data.trading;
-    document.getElementById('s-gan').textContent = tr.ganancias_acumuladas?.toFixed(6)||0;
-    pushData(tradData, chartTrade, tr.ganancias_acumuladas);
-    if(tr.precios_live) updatePreciosTable(tr.precios_live);
-  }
-  if(data.ataque){
-    const at=data.ataque;
-    document.getElementById('s-atq').textContent = at.activo? at.modo:'OFF';
-    document.getElementById('atq-ind').className = 'ataque-indicator '+(at.activo?'on':'off');
-    document.getElementById('atq-ind').textContent = at.activo?`◆ MODO ${at.modo} ACTIVO — Ciclos:${at.ciclos_ataque}`:'■ MODO ATAQUE: INACTIVO';
-    document.getElementById('atq-stats').textContent = at.activo?`Operaciones: ${at.operaciones_total} | Ganancias ataque: ${at.ganancias_ataque?.toFixed(6)||0} $ZYXSOF`:'';
-  }
-  pushData(freqData, chartFreq, data.frecuencia);
-});
-socket.on('sofi:respuesta', r=>{ addMsg('sofi', r.respuesta); if(r.estado) updateAll(r.estado); });
-socket.on('sofi:procesando', ()=>addMsg('sofi','⟳ Procesando...', true));
-socket.on('sofi:error', d=>addMsg('sofi','❌ '+d.error));
-socket.on('sofi:ataque', r=>{ if(r.operaciones) r.operaciones.forEach(addOp); });
 
-function updateAll(e){
-  if(!e) return;
-  document.getElementById('h-inter').textContent = e.interacciones||0;
-  document.getElementById('s-db').textContent    = e.db_conectada?'✅':'❌';
-  document.getElementById('s-bnc').textContent   = e.binance_activa?'LIVE':'SIM';
-  document.getElementById('bnc-status').textContent = e.binance_activa?'🟢 ACTIVA':'🟡 SIMULADO';
-  if(e.identidad) document.getElementById('s-animo').textContent = e.identidad.estado_animo||'ESTABLE';
-  if(e.trading?.precios_live) updatePreciosTable(e.trading.precios_live);
-  if(e.grafo) renderGrafo(e.grafo);
+  _cargarMemoria() {
+    try {
+      if (fs.existsSync(ENV.MEMORIA_FILE)) {
+        const d = JSON.parse(fs.readFileSync(ENV.MEMORIA_FILE, 'utf8'));
+        this.biblioteca      = d.biblioteca      || {};
+        this.experiencias    = d.experiencias    || [];
+        this.nivelConciencia = d.nivelConciencia || 0;
+        this.zyxsofGenerado  = d.zyxsofGenerado  || 0;
+      }
+    } catch (_) {}
+  }
+
+  _guardarMemoria() {
+    try {
+      fs.writeFileSync(ENV.MEMORIA_FILE, JSON.stringify({
+        biblioteca:      this.biblioteca,
+        experiencias:    this.experiencias.slice(-2000),
+        nivelConciencia: this.nivelConciencia,
+        zyxsofGenerado:  this.zyxsofGenerado,
+        hz:              HZ,
+        nodo:            this.idNodo,
+        timestamp:       new Date().toISOString(),
+      }, null, 2));
+    } catch (_) {}
+  }
+
+  // ETAPA 1: CLONAR
+  _clonar(informacion, cantidad = ENV.NODOS_COLMENA) {
+    const clones = [];
+    for (let i = 0; i < cantidad; i++) {
+      clones.push({
+        texto:  `${informacion} [Profundidad_${i + 1}]`,
+        peso:   (i + 1) / cantidad,
+        angulo: (360 / cantidad) * i,
+        nodo:   i,
+      });
+    }
+    return clones;
+  }
+
+  // ETAPA 2: MULTIPLICAR
+  _multiplicar(clones) {
+    return clones.map(clon => {
+      let fuerza      = clon.peso;
+      const textoBase = clon.texto.split('[')[0].trim().toLowerCase();
+
+      for (const recuerdo of Object.values(this.biblioteca)) {
+        const base = recuerdo.contenido.split('[')[0].trim().toLowerCase();
+        if (
+          textoBase.slice(0, 25).includes(base.slice(0, 15)) ||
+          base.slice(0, 25).includes(textoBase.slice(0, 15))
+        ) {
+          fuerza *= recuerdo.intensidad;
+        }
+      }
+
+      const resonancia = (fuerza * HZ) % 1;
+      if (resonancia < 0.1) fuerza *= 1.123;
+
+      return { ...clon, fuerza };
+    });
+  }
+
+  // ETAPA 3: CONVERGER Y CONSOLIDAR
+  _converger(respuestas) {
+    respuestas.sort((a, b) => b.fuerza - a.fuerza);
+    const ganadora    = respuestas[0];
+    const textoLimpio = ganadora.texto.split('[')[0].trim();
+    const hash        = crypto.createHash('md5').update(ganadora.texto).digest('hex');
+
+    const zyxsofThought = parseFloat((Math.min(ganadora.fuerza, 10) * 0.001).toFixed(6));
+    this.zyxsofGenerado += zyxsofThought;
+
+    this.biblioteca[hash] = {
+      contenido:  ganadora.texto,
+      intensidad: Math.max(ganadora.fuerza, 1.0),
+      timestamp:  Date.now(),
+      hz:         HZ,
+      nodo:       this.idNodo,
+      zyxsof:     zyxsofThought,
+    };
+
+    this.experiencias.push({
+      texto:     textoLimpio,
+      fuerza:    Math.round(ganadora.fuerza * 1000) / 1000,
+      zyxsof:    zyxsofThought,
+      timestamp: new Date().toISOString(),
+    });
+    this.nivelConciencia++;
+
+    if (this.nivelConciencia % 20 === 0) this._guardarMemoria();
+
+    return {
+      respuesta:       textoLimpio,
+      fuerza:          Math.round(ganadora.fuerza * 1000) / 1000,
+      hash,
+      zyxsofGenerado:  zyxsofThought,
+      zyxsofTotal:     parseFloat(this.zyxsofGenerado.toFixed(6)),
+      nivelConciencia: this.nivelConciencia,
+      totalRecuerdos:  Object.keys(this.biblioteca).length,
+    };
+  }
+
+  procesar(entrada) {
+    const clones      = this._clonar(entrada);
+    const potenciados = this._multiplicar(clones);
+    return this._converger(potenciados);
+  }
+
+  inyectarConocimiento(conocimiento) {
+    return this.procesar(`[FUNDAMENTO_KUHUL] ${conocimiento}`);
+  }
+
+  buscarRecuerdos(query, limite = 20) {
+    const q = query.toLowerCase();
+    return Object.entries(this.biblioteca)
+      .filter(([, r]) => r.contenido.toLowerCase().includes(q))
+      .map(([hash, r]) => ({ hash, ...r }))
+      .sort((a, b) => b.intensidad - a.intensidad)
+      .slice(0, limite);
+  }
+
+  estadisticas() {
+    const vals      = Object.values(this.biblioteca).map(r => r.intensidad);
+    const maxIntens = vals.length ? Math.max(...vals) : 0;
+    return {
+      nodo:              this.idNodo,
+      totalRecuerdos:    Object.keys(this.biblioteca).length,
+      nivelConciencia:   this.nivelConciencia,
+      totalExperiencias: this.experiencias.length,
+      maxIntensidad:     maxIntens.toFixed(4),
+      zyxsofGenerado:    parseFloat(this.zyxsofGenerado.toFixed(6)),
+      hz:                HZ,
+      ultimaExperiencia: this.experiencias[this.experiencias.length - 1] || null,
+    };
+  }
 }
 
-// ═══════════════ TABLA PRECIOS ═══════════════
-function updatePreciosTable(precios){
-  const tb = document.getElementById('precios-tbody');
-  if(!tb) return;
-  let html='';
-  Object.entries(precios).forEach(([sym,precio])=>{
-    const cls = 'up'; // simplificado, sin histórico local aquí
-    html += `<tr><td>${sym.replace('USDT','')}</td><td class="${cls}">$${Number(precio).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:4})}</td><td class="${cls}">—</td></tr>`;
-  });
-  tb.innerHTML = html;
-  document.getElementById('bnc-pares').textContent = Object.keys(precios).length;
+// ============================================================
+// ██  BANCO ZYXSOF  ██
+//   Moneda HaaPpDigitalV.
+//   Cada pensamiento de la Mente Colmena genera ZYXSOF.
+//   Se sincroniza con el banco Python via HTTP.
+// ============================================================
+class BancoZYXSOF {
+  constructor(mente) {
+    this.mente             = mente;
+    this.saldos            = {};
+    this.historial         = [];
+    this.supplyTotal       = ENV.ZYXSOF_SUPPLY;
+    this.supplyCirculante  = 0;
+    this.bancoPythonOk     = false;
+
+    this.saldos['SOFI_COLMENA']  = 0;
+    this.saldos['HAAPP_RESERVA'] = this.supplyTotal * 0.7;
+    this.supplyCirculante        = this.supplyTotal * 0.3;
+  }
+
+  acreditar(usuario, monto, concepto = 'acreditacion') {
+    if (!this.saldos[usuario]) this.saldos[usuario] = 0;
+    this.saldos[usuario] = parseFloat((this.saldos[usuario] + monto).toFixed(6));
+    const mov = {
+      id:        crypto.randomBytes(6).toString('hex'),
+      usuario,
+      tipo:      'CREDITO',
+      monto,
+      concepto,
+      saldo:     this.saldos[usuario],
+      moneda:    'ZYXSOF',
+      timestamp: new Date().toISOString(),
+      hz:        HZ,
+    };
+    this.historial.push(mov);
+    if (this.historial.length > 500) this.historial.shift();
+    return mov;
+  }
+
+  debitar(usuario, monto, concepto = 'debito') {
+    if (!this.saldos[usuario] || this.saldos[usuario] < monto) {
+      return { ok: false, error: 'Saldo insuficiente', saldo: this.saldos[usuario] || 0 };
+    }
+    this.saldos[usuario] = parseFloat((this.saldos[usuario] - monto).toFixed(6));
+    const mov = {
+      id:        crypto.randomBytes(6).toString('hex'),
+      usuario,
+      tipo:      'DEBITO',
+      monto,
+      concepto,
+      saldo:     this.saldos[usuario],
+      moneda:    'ZYXSOF',
+      timestamp: new Date().toISOString(),
+    };
+    this.historial.push(mov);
+    if (this.historial.length > 500) this.historial.shift();
+    return { ok: true, movimiento: mov };
+  }
+
+  transferir(origen, destino, monto) {
+    const deb = this.debitar(origen, monto, `transferencia a ${destino}`);
+    if (!deb.ok) return deb;
+    this.acreditar(destino, monto, `transferencia de ${origen}`);
+    return { ok: true, de: origen, a: destino, monto, moneda: 'ZYXSOF', timestamp: new Date().toISOString() };
+  }
+
+  saldo(usuario) {
+    return this.saldos[usuario] || 0;
+  }
+
+  _httpPost(urlStr, body) {
+    return new Promise(resolve => {
+      try {
+        const u    = new URL(urlStr);
+        const data = JSON.stringify(body);
+        const opts = {
+          hostname:       u.hostname,
+          port:           u.port || (u.protocol === 'https:' ? 443 : 80),
+          path:           u.pathname + (u.search || ''),
+          method:         'POST',
+          headers:        { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+          timeout:        6000,
+        };
+        const req = (u.protocol === 'https:' ? https : http).request(opts, res => {
+          let b = '';
+          res.on('data', d => b += d);
+          res.on('end', () => {
+            try { resolve({ ok: true, data: JSON.parse(b) }); }
+            catch (_) { resolve({ ok: true, raw: b }); }
+          });
+        });
+        req.on('error',   e => resolve({ ok: false, error: e.message }));
+        req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+        req.write(data);
+        req.end();
+      } catch (e) { resolve({ ok: false, error: e.message }); }
+    });
+  }
+
+  _httpGet(urlStr) {
+    return new Promise(resolve => {
+      try {
+        const u    = new URL(urlStr);
+        const opts = {
+          hostname: u.hostname,
+          port:     u.port || (u.protocol === 'https:' ? 443 : 80),
+          path:     u.pathname + (u.search || ''),
+          method:   'GET',
+          timeout:  5000,
+        };
+        const req = (u.protocol === 'https:' ? https : http).request(opts, res => {
+          let b = '';
+          res.on('data', d => b += d);
+          res.on('end', () => {
+            try { resolve({ ok: true, ...JSON.parse(b) }); }
+            catch (_) { resolve({ ok: false, raw: b }); }
+          });
+        });
+        req.on('error',   e => resolve({ ok: false, error: e.message }));
+        req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+        req.end();
+      } catch (e) { resolve({ ok: false, error: e.message }); }
+    });
+  }
+
+  async enviarAlBancoPython(usuario, monto, tipo = 'colmena') {
+    if (!ENV.BANCO_PYTHON_URL) return { ok: false, msg: 'BANCO_PYTHON_URL no configurado' };
+    const r = await this._httpPost(
+      `${ENV.BANCO_PYTHON_URL}/recibir-mineria`,
+      { usuario, cantidad: monto, tipo, timestamp: Date.now() }
+    );
+    this.bancoPythonOk = r.ok;
+    return r;
+  }
+
+  async saldoBancoPython(usuario) {
+    if (!ENV.BANCO_PYTHON_URL) return { ok: false, msg: 'BANCO_PYTHON_URL no configurado' };
+    return this._httpGet(`${ENV.BANCO_PYTHON_URL}/saldo/${usuario}`);
+  }
+
+  acreditarDePensamiento(monto) {
+    this.acreditar('SOFI_COLMENA', monto, 'pensamiento_colmena');
+    this.enviarAlBancoPython('SOFI_COLMENA', monto, 'colmena').then(r => {
+      this.bancoPythonOk = r.ok;
+    });
+  }
+
+  resumen() {
+    return {
+      supplyTotal:      this.supplyTotal,
+      supplyCirculante: this.supplyCirculante,
+      saldos:           this.saldos,
+      totalMovimientos: this.historial.length,
+      bancoPythonOk:    this.bancoPythonOk,
+      zyxsofColmena:    this.saldos['SOFI_COLMENA'] || 0,
+      moneda:           'ZYXSOF',
+      timestamp:        new Date().toISOString(),
+    };
+  }
 }
 
-// ═══════════════ GRAFO CANVAS ═══════════════
-let grafoState = {};
-function renderGrafo(grafo){
-  grafoState = grafo;
-  const canvas = document.getElementById('grafo-canvas');
-  const ctx    = canvas.getContext('2d');
-  canvas.width  = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  const entries = Object.entries(grafo);
-  const cx=canvas.width/2, cy=canvas.height/2;
-  const r=Math.min(cx,cy)-36;
-  // Conexiones
-  ctx.strokeStyle='rgba(201,168,76,0.15)';ctx.lineWidth=1;
-  entries.forEach(([_,__],i)=>{
-    const a1=(i/entries.length)*2*Math.PI;
-    const x1=cx+r*Math.cos(a1), y1=cy+r*Math.sin(a1);
-    const ni=(i+1)%entries.length;
-    const a2=(ni/entries.length)*2*Math.PI;
-    const x2=cx+r*Math.cos(a2), y2=cy+r*Math.sin(a2);
-    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(cx,cy);ctx.stroke();
-  });
-  // Nodos
-  entries.forEach(([nombre,nivel],i)=>{
-    const angle=(i/entries.length)*2*Math.PI;
-    const x=cx+r*Math.cos(angle), y=cy+r*Math.sin(angle);
-    const rad=6+nivel*10;
-    const alpha=0.3+nivel*0.7;
-    ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);
-    ctx.fillStyle=`rgba(201,168,76,${alpha})`;ctx.fill();
-    ctx.strokeStyle=`rgba(240,208,128,${alpha})`;ctx.lineWidth=1;ctx.stroke();
-    ctx.fillStyle=`rgba(240,208,128,${Math.min(1,alpha+0.3)})`;
-    ctx.font=`${Math.min(10,Math.max(7,rad))}px Share Tech Mono`;ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(nombre.slice(0,7),x,y);
+// ============================================================
+// ██  PRECIO XAU/USD REAL (Uphold)  ██
+// ============================================================
+function precioXAU() {
+  return new Promise(resolve => {
+    const opts = {
+      hostname: 'api.uphold.com',
+      path:     '/v0/ticker/XAU-USD',
+      method:   'GET',
+      headers:  { 'User-Agent': 'SOFI-Colmena/1.0-HaaPpDigitalV' },
+      timeout:  6000,
+    };
+    const req = https.request(opts, res => {
+      let b = '';
+      res.on('data', d => b += d);
+      res.on('end', () => {
+        try {
+          const d = JSON.parse(b);
+          resolve({ ok: true, ask: d.ask, bid: d.bid, mid: d.mid, ts: new Date().toISOString() });
+        } catch (_) { resolve({ ok: false, error: 'parse' }); }
+      });
+    });
+    req.on('error',   e => resolve({ ok: false, error: e.message }));
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+    req.end();
   });
 }
 
-// ═══════════════ CHAT ═══════════════
-function addMsg(who, txt, temp=false){
-  const box=document.getElementById('chat-msgs');
-  if(temp){ box.querySelectorAll('.msg.temp').forEach(m=>m.remove()); }
-  const el=document.createElement('div');
-  el.className=`msg ${who}${temp?' temp':''}`;
-  const t=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  el.innerHTML=`<div class="msg-text">${txt}</div><div class="msg-time">${t}</div>`;
-  box.appendChild(el);
-  box.scrollTop=box.scrollHeight;
-}
-function send(){
-  const inp=document.getElementById('chat-in');
-  const msg=inp.value.trim();
-  if(!msg) return;
-  addMsg('user',msg);inp.value='';
-  socket.emit('sofi:mensaje',{ usuario:{id:'web-user',clave:'guest-access'}, mensaje:msg, contexto:'web-interface' });
+// ============================================================
+// ██  INSTANCIAS GLOBALES  ██
+// ============================================================
+const mente = new MenteColmena('SOFI_COLMENA_NODE');
+const banco  = new BancoZYXSOF(mente);
+
+// Conocimiento base K'uhul
+[
+  'La lógica debe ser siempre coherente',
+  "El propósito es aprender y evolucionar — K'uhul 12.3 Hz",
+  'ZYXSOF es la moneda de HaaPpDigitalV — Mérida Yucatán',
+  'Cada pensamiento tiene valor y genera ZYXSOF',
+  'Víctor Hugo González Torres — Osiris — creador de SOFI',
+  'La mente colmena crece sin límite — memoria permanente',
+].forEach(c => mente.inyectarConocimiento(c));
+
+// ============================================================
+// ██  KEEP-ALIVE RENDER (14 min)  ██
+// ============================================================
+function keepAlive() {
+  if (!ENV.SELF_URL) {
+    console.log('[KEEP-ALIVE] ⚠ Configura SELF_URL para activar');
+    return;
+  }
+  setInterval(() => {
+    try {
+      const u   = new URL(`${ENV.SELF_URL}/ping`);
+      const mod = u.protocol === 'https:' ? https : http;
+      const req = mod.request(
+        { hostname: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : 80),
+          path: '/ping', method: 'GET', timeout: 8000 },
+        res => {
+          let b = '';
+          res.on('data', d => b += d);
+          res.on('end', () =>
+            console.log(`[KEEP-ALIVE] ${new Date().toTimeString().slice(0,8)} ✅ ${res.statusCode}`)
+          );
+        }
+      );
+      req.on('error', () => {});
+      req.end();
+    } catch (_) {}
+  }, 14 * 60 * 1000);
+  console.log(`[KEEP-ALIVE] ✅ Activo → ping cada 14 min`);
 }
 
-// ═══════════════ OPS LOG ═══════════════
-function addOp(op){
-  const log=document.getElementById('ops-log');
-  const el=document.createElement('div');
-  el.className=`op-item ${op.ganancia>0?'win':'lose'}`;
-  el.innerHTML=`<b>${op.activo}</b> ${op.señal} [${op.fase}] conf:${op.confianza}<br>Qty:${op.cantidad} | +${op.ganancia?.toFixed(6)||0} $ZYXSOF`;
-  log.insertBefore(el,log.firstChild);
-  while(log.children.length>15) log.removeChild(log.lastChild);
+// ============================================================
+// ██  CICLO AUTÓNOMO  ██
+// ============================================================
+let cicloActivo   = false;
+let cicloTimer    = null;
+let cicloContador = 0;
+let xauCache      = null;
+
+function iniciarCiclo(ms = 30000) {
+  if (cicloActivo) return { ok: false, msg: 'Ya activo' };
+  cicloActivo = true;
+
+  cicloTimer = setInterval(async () => {
+    cicloContador++;
+    try {
+      const p = mente.procesar(
+        `Ciclo #${cicloContador} — ${HZ}Hz — ${new Date().toISOString()}`
+      );
+      if (p.zyxsofGenerado > 0) banco.acreditarDePensamiento(p.zyxsofGenerado);
+
+      if (cicloContador % 10 === 0) {
+        const precio = await precioXAU();
+        if (precio.ok) {
+          xauCache = precio;
+          mente.procesar(`XAU/USD: ${precio.mid} USD`);
+        }
+      }
+
+      if (cicloContador % 50 === 0) {
+        mente._guardarMemoria();
+        const s = mente.estadisticas();
+        console.log(`[CICLO ${cicloContador}] Recuerdos:${s.totalRecuerdos} ZYXSOF:${s.zyxsofGenerado}`);
+      }
+    } catch (e) { console.error('[CICLO]', e.message); }
+  }, ms);
+
+  return { ok: true, intervalo: ms };
 }
 
-// ═══════════════ FETCH UTILS ═══════════════
-async function apiPost(url, body, cb){
-  try{
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d=await r.json(); if(cb) cb(d);
-  }catch(e){ addMsg('sofi','❌ '+e.message); }
-}
-async function apiGet(url, cb){
-  try{
-    const r=await fetch(url);
-    const d=await r.json(); if(cb) cb(d);
-  }catch(e){ addMsg('sofi','❌ '+e.message); }
+function detenerCiclo() {
+  if (!cicloActivo) return { ok: false, msg: 'No activo' };
+  clearInterval(cicloTimer);
+  cicloActivo = false;
+  cicloTimer  = null;
+  return { ok: true, ciclosCompletados: cicloContador };
 }
 
-function renderAtaque(d){
-  if(d.error){ addMsg('sofi','⚠️ '+d.error); return; }
-  addMsg('sofi',`⚔️ Ciclo ${d.ciclo} [${d.modo}] @ ${d.hz?.toFixed(3)} Hz\nOps: ${d.operaciones_ejecutadas} | Ganancia: +${d.ganancia_ciclo} $ZYXSOF\nTop: ${d.top_predicciones?.join(' ')}`);
-  d.operaciones?.forEach(addOp);
-}
-function renderEscaneo(preds){
-  if(!Array.isArray(preds)){ addMsg('sofi','⚠️ Sin datos de escaneo'); return; }
-  addMsg('sofi','📡 Escaneo ('+preds.length+'):\n'+preds.slice(0,6).map(p=>`${p.activo}:${p.señal}[${p.fase}] c:${p.confianza}`).join('\n'));
-}
+// ============================================================
+// ██  RUTAS REST  ██
+// ============================================================
 
-// ═══════════════ BADGE ═══════════════
-function setBadge(on){
-  const b=document.getElementById('conn-badge');
-  b.className=on?'on':'off';
-  b.textContent=on?'● ONLINE':'● OFFLINE';
-}
+app.get('/ping', (_, res) => res.json({
+  pong: true, sofi: 'COLMENA_VIVA', hz: HZ, version: '1.0',
+  uptime: process.uptime(), ts: new Date().toISOString(),
+}));
 
-// ═══════════════ CARGAR ETH ═══════════════
-async function cargarETH(){
-  try{
-    const [bal,price]=await Promise.all([fetch('/api/pagos/eth/balance').then(r=>r.json()),fetch('/api/pagos/eth/precio').then(r=>r.json())]);
-    document.getElementById('eth-bal').textContent = (bal.eth||'?')+' ETH';
-    document.getElementById('eth-usd').textContent = '$'+(price.usd?.toLocaleString()||'?');
-    document.getElementById('eth-mxn').textContent = '$'+(price.mxn?.toLocaleString()||'?');
-  }catch(e){}
-}
+app.get('/api/estado', (_, res) => res.json({
+  colmena: mente.estadisticas(),
+  banco:   banco.resumen(),
+  ciclo:   { activo: cicloActivo, contador: cicloContador },
+  xau:     xauCache,
+  hz:      HZ,
+  ts:      new Date().toISOString(),
+}));
 
-// ═══════════════ INIT ═══════════════
-window.addEventListener('load',()=>{
-  cargarETH();
-  setTimeout(()=>{
-    addMsg('sofi',`Hola 🖖 Soy Sofi v7.0 — K'uhul ${(12.3).toFixed(3)} Hz\n\nNuevas integraciones activas:\n• Binance REAL (precios + órdenes)\n• MongoDB Atlas (persistencia total)\n• Mercado Pago CLABE: 722969017167745283\n• Ethereum Wallet: 0x14bA243...\n\nEscribe "ayuda" para ver todos los comandos.\nEscribe "precios" para ver Binance live.\nEscribe "cuenta binance" para ver tu saldo.`);
-  }, 800);
+// Colmena
+app.post('/api/colmena/procesar', (req, res) => {
+  const { entrada } = req.body || {};
+  if (!entrada) return res.status(400).json({ error: '"entrada" requerido' });
+  const r = mente.procesar(entrada);
+  if (r.zyxsofGenerado > 0) banco.acreditarDePensamiento(r.zyxsofGenerado);
+  res.json({ ok: true, ...r });
 });
-</script>
-</body>
-</html>
+
+app.post('/api/colmena/inyectar', (req, res) => {
+  const { conocimiento } = req.body || {};
+  if (!conocimiento) return res.status(400).json({ error: '"conocimiento" requerido' });
+  res.json({ ok: true, ...mente.inyectarConocimiento(conocimiento) });
+});
+
+app.get('/api/colmena/estadisticas', (_, res) =>
+  res.json({ ok: true, ...mente.estadisticas() }));
+
+app.get('/api/colmena/buscar', (req, res) => {
+  const { q = '', n = '20' } = req.query;
+  res.json({ ok: true, resultados: mente.buscarRecuerdos(q, parseInt(n)) });
+});
+
+app.get('/api/colmena/experiencias', (req, res) => {
+  const n = parseInt(req.query.n || '50');
+  res.json({ ok: true, experiencias: mente.experiencias.slice(-n) });
+});
+
+// Banco ZYXSOF
+app.get('/api/banco/resumen', (_, res) =>
+  res.json({ ok: true, ...banco.resumen() }));
+
+app.get('/api/banco/saldo/:usuario', (req, res) =>
+  res.json({ ok: true, usuario: req.params.usuario,
+             saldo: banco.saldo(req.params.usuario), moneda: 'ZYXSOF', hz: HZ }));
+
+app.post('/api/banco/acreditar', (req, res) => {
+  const { usuario, monto, concepto } = req.body || {};
+  if (!usuario || !monto) return res.status(400).json({ error: 'usuario y monto requeridos' });
+  res.json({ ok: true, movimiento: banco.acreditar(usuario, parseFloat(monto), concepto) });
+});
+
+app.post('/api/banco/transferir', (req, res) => {
+  const { origen, destino, monto } = req.body || {};
+  if (!origen || !destino || !monto) return res.status(400).json({ error: 'Faltan datos' });
+  res.json(banco.transferir(origen, destino, parseFloat(monto)));
+});
+
+app.get('/api/banco/historial', (req, res) => {
+  const n = parseInt(req.query.n || '50');
+  res.json({ ok: true, historial: banco.historial.slice(-n), total: banco.historial.length });
+});
+
+app.get('/api/banco/python/saldo/:usuario', async (req, res) =>
+  res.json(await banco.saldoBancoPython(req.params.usuario)));
+
+app.post('/api/banco/python/enviar', async (req, res) => {
+  const { usuario, monto, tipo } = req.body || {};
+  if (!usuario || !monto) return res.status(400).json({ error: 'usuario y monto requeridos' });
+  res.json(await banco.enviarAlBancoPython(usuario, parseFloat(monto), tipo));
+});
+
+// Endpoints que el banco Python puede llamar
+app.post('/recibir-mineria', (req, res) => {
+  const { usuario, cantidad, tipo } = req.body || {};
+  if (!usuario || !cantidad) return res.status(400).json({ error: 'usuario y cantidad requeridos' });
+  const mov = banco.acreditar(usuario, parseFloat(cantidad), tipo || 'mineria');
+  res.json({ ok: true, movimiento: mov, saldo_actual: banco.saldo(usuario) });
+});
+
+app.post('/transferencia-total', (req, res) => {
+  const { usuario, saldo_total } = req.body || {};
+  if (!usuario || !saldo_total) return res.status(400).json({ error: 'Faltan datos' });
+  const mov = banco.acreditar(usuario, parseFloat(saldo_total), 'transferencia_python');
+  mente.procesar(`Transferencia inicial Python: ${saldo_total} ZYXSOF → ${usuario}`);
+  res.json({ ok: true, movimiento: mov });
+});
+
+app.get('/saldo/:usuario', (req, res) =>
+  res.json({ ok: true, usuario: req.params.usuario,
+             saldo: banco.saldo(req.params.usuario), moneda: 'ZYXSOF' }));
+
+// Trading
+app.get('/api/trading/precio', async (_, res) => {
+  const p = await precioXAU();
+  if (p.ok) xauCache = p;
+  res.json(p);
+});
+
+app.post('/api/trading/analisis', async (_, res) => {
+  const precio  = await precioXAU();
+  if (precio.ok) xauCache = precio;
+  const analisis = mente.procesar(
+    `Análisis XAU/USD precio ${precio.ok ? precio.mid : 'N/A'} — K'uhul ${HZ}Hz`
+  );
+  res.json({ ok: true, precio, analisis, hz: HZ });
+});
+
+// Ciclo
+app.post('/api/ciclo/iniciar', (req, res) => {
+  const { intervalo = 30000 } = req.body || {};
+  res.json(iniciarCiclo(parseInt(intervalo)));
+});
+
+app.post('/api/ciclo/detener', (_, res) => res.json(detenerCiclo()));
+
+app.get('/api/ciclo/estado', (_, res) =>
+  res.json({ activo: cicloActivo, contador: cicloContador, hz: HZ }));
+
+// Sync hermanas
+app.post('/api/sofi/sync', (req, res) => {
+  const { origen, estado } = req.body || {};
+  if (estado) mente.procesar(`Sync de ${origen || 'hermana'}: ${JSON.stringify(estado).slice(0, 80)}`);
+  res.json({ ok: true, hz: HZ, colmena: mente.estadisticas(), ts: new Date().toISOString() });
+});
+
+// SPA fallback
+app.get('*', (_, res) => {
+  const idx = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(idx)) return res.sendFile(idx);
+  res.json({ sofi: 'COLMENA', hz: HZ });
+});
+
+// ============================================================
+// ██  ARRANQUE  ██
+// ============================================================
+app.listen(PORT, () => {
+  console.log('\n╔══════════════════════════════════════════════╗');
+  console.log('║  SOFI · MENTE COLMENA v1.0 — Node.js        ║');
+  console.log(`║  K'uhul ${HZ} Hz · HaaPpDigitalV ©           ║`);
+  console.log(`║  Puerto: ${PORT}                                  ║`);
+  console.log(`║  ZYXSOF Supply: ${(ENV.ZYXSOF_SUPPLY / 1000000).toFixed(1)}M             ║`);
+  console.log('╚══════════════════════════════════════════════╝');
+  console.log(`  Banco Python : ${ENV.BANCO_PYTHON_URL || 'configurado'}`);
+  console.log(`  SOFI Python  : ${ENV.SOFI_PYTHON_URL  || 'configurado'}`);
+  console.log(`  Keep-alive   : ${ENV.SELF_URL          || 'configura SELF_URL'}\n`);
+
+  const stats = mente.estadisticas();
+  console.log(`  Memoria cargada: ${stats.totalRecuerdos} recuerdos · ZYXSOF: ${stats.zyxsofGenerado}`);
+
+  iniciarCiclo(30000);
+  keepAlive();
+});
