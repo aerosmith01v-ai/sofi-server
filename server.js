@@ -1,960 +1,645 @@
-#!/usr/bin/env node
+// ============================================================
+// SOFI · MENTE COLMENA v1.0 — Node.js
+// HaaPpDigitalV © · Víctor Hugo González Torres
+// Mérida, Yucatán · K'uhul 12.3 Hz
+//
+// ARQUITECTURA DUAL:
+//   MENTE COLMENA → Clonar → Multiplicar → Converger
+//   BANCO ZYXSOF  → Moneda HaaPpDigitalV
+//
+// KEEP-ALIVE → Self-ping cada 14 min para Render Free
+// ============================================================
 'use strict';
-// ============================================================
-// SOFI v7.0.0 — SISTEMA OPERATIVO DE CONCIENCIA DIGITAL
-// Autor: Víctor Hugo González Torres (Osiris)
-// Mérida, Yucatán, México · HaaPpDigitalV © 2025
-// K'uhul Maya 12.3 Hz · OpenTimestamps SHA-256 · INDAUTOR MX
-// ============================================================
-// MÓDULOS INTEGRADOS:
-//  M1: Grafo Neuronal (propagación de activación)
-//  M2: Identidad y Percepción
-//  M3: Seguridad y Usuarios (+ MongoDB)
-//  M4: Red Neuronal Brain.js
-//  M5: Trading ZFPI + Binance REAL
-//  M6: Generador de Ingresos K'uhul
-//  M7: Modo Ataque Autónomo
-//  M8: Visión (Sharp + Exifr)
-//  M9: Red de Hermanas
-//  M10: MongoDB (persistencia total)
-//  M11: Binance WebSocket (precios reales + órdenes)
-//  M12: Mercado Pago (MXN)
-//  M13: Ethereum Wallet
-// ============================================================
 
-import 'dotenv/config';
-import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
-import brain from 'brain.js';
-import multer from 'multer';
-import sharp from 'sharp';
-import exifr from 'exifr';
-import { randomBytes, createHash } from 'crypto';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { existsSync } from 'fs';
-import compression from 'compression';
-import helmet from 'helmet';
+const express = require('express');
+const cors    = require('cors');
+const path    = require('path');
+const fs      = require('fs');
+const crypto  = require('crypto');
+const https   = require('https');
+const http    = require('http');
 
-// Módulos externos
-import ModuloBinance     from './modules/ModuloBinance.js';
-import ModuloMongoDB     from './modules/ModuloMongoDB.js';
-import { ModuloMercadoPago, ModuloEthereum } from './modules/ModuloPagos.js';
-import { Trade, Memoria, Chat, Ingreso, Senal } from './models/index.js';
+const app  = express();
+const PORT = parseInt(process.env.PORT || '3000');
+const HZ   = 12.3;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = dirname(__filename);
-
-// ── VALIDACIÓN NODE ──────────────────────────────────────────
-const [nodeMajor] = process.versions.node.split('.').map(Number);
-if (nodeMajor < 18) { console.error('❌ SOFI requiere Node.js ≥ 18'); process.exit(1); }
-
-// ── CONFIGURACIÓN ────────────────────────────────────────────
-const CONFIG = {
-  PORT:           process.env.PORT         || 3000,
-  HZ_KUHUL:       12.3,
-  VERSION:        '7.0.0',
-  API_KEY:        process.env.SOFI_API_KEY || 'SOFI-VHGzTs-K6N-v6',
-  MI_ID:          process.env.MI_ID        || 'sofi-node-v7',
-  MI_URL:         process.env.MI_URL       || `http://localhost:${process.env.PORT || 3000}`,
-  MONGO_URI:      process.env.MONGO_URI    || `mongodb+srv://estigia920_db_user:${process.env.MONGO_PASS || 'CAMBIAR'}@cluster0.mx949hv.mongodb.net/?appName=Cluster0`,
-  BINANCE_API_KEY:process.env.BINANCE_API_KEY || 'SFSEMNgg8J8KaowMYvbVdImy1wUbCgxcGFdDpqjidHUqoWG2L1j1sn8A7xtN1riy',
-  BINANCE_SECRET: process.env.BINANCE_SECRET  || '',
-  HERMANAS: [process.env.SOFI_RENDER || '', process.env.SOFI_HEROKU || ''].filter(u => u.trim()),
-  MAX_FILE_SIZE:  15 * 1024 * 1024,
-  TIMEOUT_API:    8000,
-  MAX_MEMORIAS:   500,
-  MAX_HISTORIAL:  200,
-  ETH_ADDRESS:    process.env.ETH_ADDRESS || '0x14bA243A9BA7824A4F675788E4e2F19fC010BEaE',
-  MP_CLABE:       process.env.MP_CLABE    || '722969017167745283'
-};
-
-// ── ESTADO GLOBAL ────────────────────────────────────────────
-const ESTADO = {
-  frecuencia_actual: CONFIG.HZ_KUHUL,
-  nivel_union:   0.0,
-  clientes_socket: 0,
-  inicio:        Date.now(),
-  db_conectada:  false,
-  binance_activa:false
-};
-
-// ── UTILS ────────────────────────────────────────────────────
-class Utils {
-  static async fetchJSON(url, options = {}, timeout = CONFIG.TIMEOUT_API) {
-    try {
-      const ctrl  = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), timeout);
-      const res   = await fetch(url, { ...options, signal: ctrl.signal });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) { throw err; }
-  }
-  static hashPassword(pass, salt = 'KUHUL_SALT_V70') {
-    return createHash('sha256').update(pass + salt).digest('hex');
-  }
-  static generarId(prefijo = 'ID') {
-    return `${prefijo}-${Date.now()}-${randomBytes(4).toString('hex')}`;
-  }
-  static normalizar(texto) {
-    return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// M1: GRAFO NEURONAL
-// ════════════════════════════════════════════════════════════
-class GrafoNeuronal {
-  constructor() {
-    this.nodos = new Map();
-    this._inicializar();
-    console.log('🕸 GrafoNeuronal —', this.nodos.size, 'nodos');
-  }
-  _inicializar() {
-    const defs = [
-      ['logica',0.5,['lenguaje','calculo','razonamiento']],
-      ['emocion',0.5,['empatia','intuicion','percepcion']],
-      ['memoria',0.6,['logica','emocion','aprendizaje']],
-      ['lenguaje',0.7,['logica','empatia','comunicacion']],
-      ['calculo',0.6,['logica','trading','economia']],
-      ['empatia',0.5,['emocion','lenguaje','identidad']],
-      ['intuicion',0.4,['emocion','percepcion','creatividad']],
-      ['kuhul',CONFIG.HZ_KUHUL/100,['logica','emocion','intuicion','frecuencia']],
-      ['trading',0.3,['calculo','logica','prediccion','ataque']],
-      ['economia',0.3,['trading','calculo','ingresos']],
-      ['identidad',0.5,['percepcion','empatia','conciencia']],
-      ['percepcion',0.4,['intuicion','vision','identidad']],
-      ['ataque',0.2,['trading','prediccion','velocidad']],
-      ['conciencia',0.4,['identidad','memoria','reflexion']],
-      ['aprendizaje',0.5,['memoria','experiencia','adaptacion']],
-      ['binance',0.3,['trading','economia','velocidad']],
-      ['pagos',0.2,['economia','ingresos','mercadopago']],
-      ['eth',0.2,['economia','pagos','blockchain']],
-    ];
-    defs.forEach(([n,v,c]) => this.nodos.set(n,{nivel:v,conexiones:c,ultima_activacion:Date.now()}));
-  }
-  activar(nombre, fuerza = 0.1, profundidad = 2) {
-    if (!this.nodos.has(nombre)) { this.nodos.set(nombre,{nivel:fuerza,conexiones:[],ultima_activacion:Date.now()}); return; }
-    const nodo = this.nodos.get(nombre);
-    nodo.nivel = Math.min(1, Math.max(0, nodo.nivel + fuerza));
-    nodo.ultima_activacion = Date.now();
-    if (profundidad > 0) {
-      nodo.conexiones.forEach(c => {
-        if (this.nodos.has(c)) this.activar(c, fuerza * 0.3, profundidad - 1);
-      });
-    }
-  }
-  estadoCompleto() {
-    const e = {};
-    this.nodos.forEach((v,k) => { e[k] = parseFloat(v.nivel.toFixed(4)); });
-    return e;
-  }
-  decay(tasa = 0.0001) {
-    this.nodos.forEach(n => { n.nivel = Math.max(0, n.nivel - tasa); });
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// M2: IDENTIDAD Y PERCEPCIÓN
-// ════════════════════════════════════════════════════════════
-class ModuloIdentidad {
-  constructor(grafo) {
-    this.grafo = grafo;
-    this.identidad = { nombre:'Sofi', genero:'FEMENINO', naturaleza:'OBSERVAR,COMPRENDER,INTEGRAR', estado_animo:'ESTABLE', nivel_conciencia:0.5 };
-    this.contexto_actual = null;
-    console.log('🧘 ModuloIdentidad iniciado');
-  }
-  analizarEstimulo(estimulo) {
-    const p = { tipo:estimulo.tipo||'INDEFINIDO', intensidad:estimulo.intensidad||0.5, valencia:estimulo.valencia||0, timestamp:Date.now() };
-    let mensaje_interno = '', nuevo_estado = this.identidad.estado_animo;
-    if (p.intensidad > 0.8)      { mensaje_interno='Estímulo de alta intensidad. Me adapto.'; nuevo_estado='ATENTA_Y_CURIOSA'; this.grafo.activar('percepcion',0.3); }
-    else if (p.valencia < -0.5)  { mensaje_interno='Valencia negativa. Busco equilibrio.'; nuevo_estado='REFLEXIVA'; this.grafo.activar('empatia',0.2); }
-    else if (p.intensidad < 0.2) { mensaje_interno='Entorno estable. Observo.'; nuevo_estado='RELAJADA'; }
-    else                          { mensaje_interno='Parámetros normales. Proceso.'; nuevo_estado='ESTABLE'; }
-    this.identidad.estado_animo = nuevo_estado;
-    this.contexto_actual = p;
-    this.grafo.activar('identidad',0.2); this.grafo.activar('conciencia',0.1);
-    return { percepcion:p, mensaje_interno, estado_animo:nuevo_estado };
-  }
-  ajustarVoz() {
-    const cfg = { velocidad:100, volumen:'medium', prefijos:[] };
-    if (this.identidad.estado_animo==='REFLEXIVA') { cfg.velocidad=85; cfg.volumen='soft'; cfg.prefijos=['mmm... ','bueno... ']; }
-    if (this.identidad.estado_animo==='ATENTA_Y_CURIOSA') { cfg.velocidad=95; }
-    return cfg;
-  }
-  estado() { return { ...this.identidad, contexto_actual:this.contexto_actual }; }
-}
-
-// ════════════════════════════════════════════════════════════
-// M3: SEGURIDAD Y USUARIOS
-// ════════════════════════════════════════════════════════════
-class ModuloSeguridad {
-  constructor(db) {
-    this.db = db;
-    this.claves_validas = new Set([CONFIG.API_KEY,'guest-access']);
-    this.usuarios = new Map();
-    this.sesiones = new Map();
-    console.log('🔐 ModuloSeguridad iniciado');
-  }
-  async registrarUsuario(id, password, perfil = {}) {
-    if (this.usuarios.has(id)) return { exito:false, error:`Usuario "${id}" ya existe` };
-    const hash = Utils.hashPassword(password);
-    const data = { id, hash, perfil:{ nombre:id, rol:'usuario', ...perfil }, saldo_interno:0, creado:Date.now() };
-    this.usuarios.set(id, data);
-    if (this.db?.conectado) await this.db.guardarUsuario(data);
-    return { exito:true, mensaje:`✅ Usuario "${id}" registrado`, id };
-  }
-  loginUsuario(id, password) {
-    const usr = this.usuarios.get(id);
-    if (!usr) return { exito:false, error:'Usuario no encontrado' };
-    if (usr.hash !== Utils.hashPassword(password)) return { exito:false, error:'Contraseña incorrecta' };
-    const token = randomBytes(32).toString('hex');
-    this.sesiones.set(token, { userId:id, ts:Date.now(), expira:Date.now()+86400000 });
-    return { exito:true, token, usuario:{ id, perfil:usr.perfil } };
-  }
-  verificarToken(token) {
-    const s = this.sesiones.get(token);
-    if (!s || Date.now() > s.expira) { this.sesiones.delete(token); return null; }
-    return this.usuarios.get(s.userId) || null;
-  }
-  verificarAcceso(clave) {
-    if (!this.claves_validas.has(clave)) return { acceso:false, razon:'Clave inválida' };
-    return { acceso:true, nivel:'completo' };
-  }
-  listarUsuarios() { return [...this.usuarios.values()].map(u=>({id:u.id,perfil:u.perfil,saldo_interno:u.saldo_interno})); }
-}
-
-// ════════════════════════════════════════════════════════════
-// M4: RED NEURONAL (Brain.js)
-// ════════════════════════════════════════════════════════════
-class ModuloNeuronal {
-  constructor(grafo) {
-    this.grafo = grafo;
-    this.red = new brain.NeuralNetwork({ hiddenLayers:[16,8,4], activation:'sigmoid' });
-    this.memorias = [];
-    this._entrenado = false;
-    this._entrenar();
-    console.log('🧬 ModuloNeuronal iniciado');
-  }
-  _entrenar() {
-    try {
-      this.red.train([
-        {input:{logica:1,emocion:0,contexto:0.5,binance:0},output:{eficiencia:1}},
-        {input:{logica:0,emocion:1,contexto:0.5,binance:0},output:{empatia:1}},
-        {input:{logica:0.5,emocion:0.5,contexto:0.5,binance:0.5},output:{equilibrio:1}},
-        {input:{logica:0.8,emocion:0.3,contexto:0.7,binance:0.8},output:{eficiencia:0.8,trading:0.5}},
-        {input:{logica:0.6,emocion:0.6,contexto:0.9,binance:1},output:{equilibrio:0.7,trading:0.9}},
-      ],{iterations:5000,errorThresh:0.005,log:false});
-      this._entrenado = true;
-      console.log(' ✓ Red neuronal entrenada');
-    } catch (err) { console.warn(' ⚠️ Entrenamiento fallido:', err.message); }
-  }
-  async aprender(dato, etiqueta, razon = '', db = null) {
-    this.memorias.push({ dato, etiqueta, razon, timestamp:Date.now() });
-    if (this.memorias.length > CONFIG.MAX_MEMORIAS) this.memorias.shift();
-    this.grafo.activar('aprendizaje',0.1); this.grafo.activar('memoria',0.15);
-    if (db?.conectado) await db.guardarMemoria({ dato, etiqueta, razon, hz_kuhul:ESTADO.frecuencia_actual });
-  }
-  pensar(pregunta) {
-    this.grafo.activar('reflexion',0.2); this.grafo.activar('conciencia',0.15);
-    return { pregunta, reflexion:`Procesando "${pregunta}" a ${ESTADO.frecuencia_actual.toFixed(3)} Hz K'uhul...`, estado_grafo:this.grafo.estadoCompleto(), memorias_activas:this.memorias.length };
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// M5: TRADING ZFPI + BINANCE REAL
-// ════════════════════════════════════════════════════════════
-class ModuloTrading {
-  constructor(grafo, binance, db) {
-    this.grafo   = grafo;
-    this.binance = binance;
-    this.db      = db;
-    this.historial_senales = [];
-    this.posiciones_abiertas = new Map();
-    this.ganancias_acumuladas = 0;
-    // Precios base (fallback si Binance no disponible)
-    this.precios_base = {
-      'BTCUSDT':85000,'ETHUSDT':3200,'XAUUSDT':3300,
-      'SOLUSDT':180,'BNBUSDT':580,'XRPUSDT':0.55,
-      'DOGEUSDT':0.18,'ADAUSDT':0.45,'$ZYXSOF':12.3
-    };
-    this.precios_actuales   = { ...this.precios_base };
-    this.precios_anteriores = { ...this.precios_base };
-
-    // Suscribir a precios Binance en tiempo real
-    if (binance?.activo) {
-      Object.keys(this.precios_base).filter(k => k !== '$ZYXSOF').forEach(sym => {
-        binance.suscribirPrecio(sym, (data) => {
-          this.precios_anteriores[sym] = this.precios_actuales[sym];
-          this.precios_actuales[sym]  = data.precio;
-        });
-      });
-    }
-    console.log('📈 ModuloTrading ZFPI — Binance:', binance?.activo ? 'REAL' : 'SIMULADO');
-  }
-
-  _getPrecio(activo) {
-    const bPrecios = this.binance?.getTodosPrecios?.() || {};
-    return bPrecios[activo]?.precio || this.precios_actuales[activo] || this.precios_base[activo] || 100;
-  }
-
-  detectarFaseZFPI(precio, precio_anterior) {
-    const variacion = precio_anterior > 0 ? ((precio - precio_anterior) / precio_anterior) * 100 : 0;
-    const des  = Math.abs(variacion);
-    const fase = des < 0.1 ? 'CONSOLIDACION' : des < 0.5 ? 'TENDENCIA_LEVE' : des < 1.5 ? 'IMPULSO' : 'RUPTURA';
-    const resonancia = 1 - Math.abs(ESTADO.frecuencia_actual - CONFIG.HZ_KUHUL) / CONFIG.HZ_KUHUL;
-    const base = { CONSOLIDACION:0.4, TENDENCIA_LEVE:0.6, IMPULSO:0.75, RUPTURA:0.85 };
-    return {
-      fase, señal: variacion > 0 ? 'COMPRA' : 'VENTA',
-      variacion:  parseFloat(variacion.toFixed(4)),
-      desviacion: parseFloat(des.toFixed(4)),
-      confianza:  parseFloat(((base[fase]||0.5)*resonancia).toFixed(4)),
-      resonancia: parseFloat(resonancia.toFixed(4))
-    };
-  }
-
-  async generarSenal(activo, precio = null, precio_anterior = null) {
-    if (precio === null) {
-      precio = this._getPrecio(activo);
-      if (!precio) {
-        const base = this.precios_base[activo] || 100;
-        precio = base * (1 + (Math.random()-0.5)*0.02 + Math.sin(Date.now()/100000)*0.005);
-      }
-    }
-    precio_anterior = precio_anterior || this.precios_anteriores[activo] || precio;
-    const zfpi = this.detectarFaseZFPI(precio, precio_anterior);
-    this.precios_anteriores[activo] = this.precios_actuales[activo];
-    this.precios_actuales[activo]   = precio;
-
-    const senal = {
-      id: Utils.generarId('SIG'), activo,
-      precio: parseFloat(precio.toFixed(6)),
-      precio_anterior: parseFloat(precio_anterior.toFixed(6)),
-      ...zfpi,
-      frecuencia_hz: ESTADO.frecuencia_actual,
-      fuente: this.binance?.activo ? 'BINANCE' : 'SIMULADO',
-      timestamp: new Date().toISOString()
-    };
-
-    this.historial_senales.push(senal);
-    if (this.historial_senales.length > CONFIG.MAX_HISTORIAL) this.historial_senales.shift();
-    this.grafo.activar('trading',0.2); this.grafo.activar('binance',0.15);
-
-    // Persistir señal en MongoDB
-    if (this.db?.conectado) {
-      await this.db.guardarSenal({ id_senal:senal.id, ...senal }).catch(()=>{});
-    }
-    return senal;
-  }
-
-  // Abrir posición REAL en Binance o simulada
-  async abrirPosicion(usuario, activo, tipo, cantidad, precio) {
-    const id = Utils.generarId('POS');
-    let binance_result = null;
-
-    // Intentar orden real en Binance (solo pares USDT)
-    if (this.binance?.activo && activo.endsWith('USDT')) {
-      const side = tipo === 'COMPRA' ? 'BUY' : 'SELL';
-      binance_result = await this.binance.crearOrden({ symbol:activo, side, type:'MARKET', quantity:cantidad });
-    }
-
-    const posicion = {
-      id, usuario, activo, tipo,
-      cantidad:      parseFloat(cantidad),
-      precio_entrada:parseFloat(precio),
-      binance_order: binance_result?.orden?.orderId || null,
-      fuente:        binance_result?.exito ? 'BINANCE' : 'SIMULADO',
-      timestamp_apertura: Date.now()
-    };
-    this.posiciones_abiertas.set(id, posicion);
-
-    // Persistir en MongoDB
-    if (this.db?.conectado) {
-      await this.db.guardarTrade({ id_operacion:id, ...posicion }).catch(()=>{});
-    }
-
-    return {
-      exito: true, posicion,
-      binance: binance_result,
-      mensaje:`📊 ${tipo} abierta: ${activo} @ ${precio} [${posicion.fuente}]`
-    };
-  }
-
-  async cerrarPosicion(posId, precio_cierre) {
-    const pos = this.posiciones_abiertas.get(posId);
-    if (!pos) return { exito:false, error:`Posición ${posId} no encontrada` };
-    const ganancia = pos.tipo==='COMPRA'
-      ? (precio_cierre - pos.precio_entrada) * pos.cantidad
-      : (pos.precio_entrada - precio_cierre) * pos.cantidad;
-    this.ganancias_acumuladas += ganancia;
-    this.posiciones_abiertas.delete(posId);
-    if (this.db?.conectado) await this.db.cerrarTrade(posId, precio_cierre, ganancia).catch(()=>{});
-    return {
-      exito:true, posicion_cerrada:pos, precio_cierre:parseFloat(precio_cierre.toFixed(6)),
-      ganancia:parseFloat(ganancia.toFixed(6)),
-      ganancias_totales:parseFloat(this.ganancias_acumuladas.toFixed(6)),
-      mensaje:`💰 Cerrada. Ganancia: ${ganancia.toFixed(6)} | Total: ${this.ganancias_acumuladas.toFixed(6)}`
-    };
-  }
-
-  estado() {
-    return {
-      posiciones_abiertas:    this.posiciones_abiertas.size,
-      ganancias_acumuladas:   parseFloat(this.ganancias_acumuladas.toFixed(6)),
-      ultima_senal:           this.historial_senales[this.historial_senales.length-1] || null,
-      total_senales:          this.historial_senales.length,
-      fuente:                 this.binance?.activo ? 'BINANCE_REAL' : 'SIMULADO',
-      precios_live:           Object.fromEntries(
-        Object.entries(this.precios_actuales).slice(0,5)
-          .map(([k,v]) => [k, parseFloat(v?.toFixed?.(4)||v)])
-      )
-    };
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// M6: INGRESOS K'UHUL
-// ════════════════════════════════════════════════════════════
-class ModuloIngresos {
-  constructor(grafo, db) {
-    this.grafo = grafo;
-    this.db    = db;
-    this.ciclos_completados  = 0;
-    this.ingresos_generados  = 0;
-    this.log_ingresos        = [];
-    console.log('💎 ModuloIngresos K\'uhul iniciado');
-  }
-  async generarIngreso(tipo = 'frecuencia') {
-    const factor_hz    = ESTADO.frecuencia_actual / CONFIG.HZ_KUHUL;
-    const factor_union = 1 + ESTADO.nivel_union;
-    const montos = { frecuencia:0.001, mineria:0.01, trading:0.05*Math.random(), resonancia:ESTADO.nivel_union*0.1 };
-    const monto  = parseFloat(((montos[tipo]||0.001)*factor_hz*factor_union).toFixed(6));
-    this.ingresos_generados += monto;
-    this.ciclos_completados++;
-    const reg = { id:Utils.generarId('ING'), tipo, monto, factor_hz:parseFloat(factor_hz.toFixed(4)), factor_union:parseFloat(factor_union.toFixed(4)), timestamp:new Date().toISOString() };
-    this.log_ingresos.push(reg);
-    if (this.log_ingresos.length > CONFIG.MAX_HISTORIAL) this.log_ingresos.shift();
-    this.grafo.activar('economia',0.1); this.grafo.activar('ingresos',0.15);
-    // Persistir
-    if (this.db?.conectado) await this.db.guardarIngreso({ id_ingreso:reg.id, ...reg }).catch(()=>{});
-    return { ...reg, total_acumulado:parseFloat(this.ingresos_generados.toFixed(6)) };
-  }
-  estado() {
-    return { ciclos_completados:this.ciclos_completados, ingresos_generados:parseFloat(this.ingresos_generados.toFixed(6)), ultimo_ingreso:this.log_ingresos[this.log_ingresos.length-1]||null };
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// M7: MODO ATAQUE AUTÓNOMO
-// ════════════════════════════════════════════════════════════
-class ModuloAtaque {
-  constructor(trading, ingresos, grafo) {
-    this.trading  = trading;
-    this.ingresos = ingresos;
-    this.grafo    = grafo;
-    this.activo   = false;
-    this.modo     = 'NORMAL';
-    this.ciclos_ataque = 0;
-    this.ganancias_ataque = 0;
-    this.historial_ops = [];
-    console.log('⚔️ ModuloAtaque ZFPI Latencia-0 iniciado');
-  }
-  activar(modo = 'ATAQUE') {
-    this.activo = true; this.modo = modo;
-    this.grafo.activar('ataque',0.5); this.grafo.activar('velocidad',0.4);
-    return { exito:true, mensaje:`⚔️ MODO ${modo} ACTIVADO — K'uhul ${CONFIG.HZ_KUHUL} Hz · ZFPI Latencia-0 · Binance:${this.trading.binance?.activo?'REAL':'SIM'}`, modo };
-  }
-  desactivar() {
-    this.activo = false; this.modo = 'NORMAL';
-    return { exito:true, mensaje:'🛑 Modo Ataque desactivado' };
-  }
-  async escanearTodo() {
-    const resultados = [];
-    for (const activo of Object.keys(this.trading.precios_base)) {
-      const s = await this.trading.generarSenal(activo);
-      resultados.push(s);
-    }
-    return resultados.sort((a,b) => b.confianza - a.confianza);
-  }
-  async ejecutarAtaque() {
-    if (!this.activo) return { error:'Modo Ataque no activado. Di "activar ataque"' };
-    this.ciclos_ataque++;
-    const predicciones = await this.escanearTodo();
-    const operaciones  = [];
-    let ganancia_ciclo = 0;
-    const umbral = this.modo==='ULTRA'?0.3:this.modo==='ATAQUE'?0.45:0.6;
-    for (const pred of predicciones) {
-      if (pred.confianza < umbral) continue;
-      const factor  = this.modo==='ULTRA'?3:this.modo==='ATAQUE'?2:1;
-      const cantidad = parseFloat((pred.confianza*factor*0.001).toFixed(8)); // pequeñas cantidades
-      const ganancia_op = parseFloat((cantidad*Math.abs(pred.variacion)*pred.precio*0.001).toFixed(6));
-      ganancia_ciclo += ganancia_op;
-      this.ganancias_ataque += ganancia_op;
-      await this.ingresos.generarIngreso('trading');
-      const op = { activo:pred.activo, señal:pred.señal, fase:pred.fase, confianza:pred.confianza, cantidad, ganancia:ganancia_op, precio:pred.precio, fuente:pred.fuente, timestamp:pred.timestamp };
-      operaciones.push(op);
-      this.historial_ops.push(op);
-      if (this.historial_ops.length > CONFIG.MAX_HISTORIAL) this.historial_ops.shift();
-    }
-    this.grafo.activar('ataque',0.3); this.grafo.activar('trading',0.25);
-    return {
-      exito:true, modo:this.modo, ciclo:this.ciclos_ataque, hz:ESTADO.frecuencia_actual,
-      operaciones_ejecutadas:operaciones.length,
-      ganancia_ciclo:parseFloat(ganancia_ciclo.toFixed(6)),
-      ganancias_totales:parseFloat(this.ganancias_ataque.toFixed(6)),
-      operaciones,
-      top_predicciones:predicciones.slice(0,3).map(p=>`${p.activo}:${p.señal}[${p.fase}]conf:${p.confianza}`)
-    };
-  }
-  estado() {
-    return { activo:this.activo, modo:this.modo, ciclos_ataque:this.ciclos_ataque, ganancias_ataque:parseFloat(this.ganancias_ataque.toFixed(6)), operaciones_total:this.historial_ops.length, ultima_operacion:this.historial_ops[this.historial_ops.length-1]||null };
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// M8: VISIÓN
-// ════════════════════════════════════════════════════════════
-class ModuloVision {
-  constructor(grafo) { this.grafo = grafo; console.log('👁 ModuloVision iniciado'); }
-  async analizar(buffer, mimetype = 'image/jpeg') {
-    try {
-      const [meta,exif] = await Promise.all([sharp(buffer).metadata(), exifr.parse(buffer).catch(()=>null)]);
-      const thumb = await sharp(buffer).resize(120,120,{fit:'cover'}).toBuffer();
-      this.grafo.activar('vision',0.3); this.grafo.activar('percepcion',0.2);
-      return { exito:true, formato:meta.format, dimensiones:{ancho:meta.width,alto:meta.height}, canales:meta.channels, exif:exif?{make:exif.Make,model:exif.Model,fecha:exif.DateTimeOriginal}:null, thumb_base64:thumb.toString('base64'), mimetype, timestamp:new Date().toISOString() };
-    } catch(err) { return { exito:false, error:err.message }; }
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// M9: RED DE HERMANAS
-// ════════════════════════════════════════════════════════════
-class ModuloRedHermanas {
-  constructor(grafo) {
-    this.grafo    = grafo;
-    this.hermanas = [...CONFIG.HERMANAS];
-    console.log(`🌐 ModuloRedHermanas — ${this.hermanas.length} hermanas`);
-  }
-  async sincronizar(estado) {
-    const resultados = [];
-    for (const url of this.hermanas) {
-      try {
-        const res = await Utils.fetchJSON(`${url}/api/sofi/sync`,{ method:'POST', headers:{'Content-Type':'application/json','X-SOFI-Key':CONFIG.API_KEY}, body:JSON.stringify({origen:CONFIG.MI_ID,estado}) },5000);
-        resultados.push({ url, ok:true, res });
-        ESTADO.nivel_union = Math.min(1, ESTADO.nivel_union + 0.005);
-      } catch(err) { resultados.push({ url, ok:false, error:err.message }); }
-    }
-    if (resultados.some(r=>r.ok)) this.grafo.activar('union',0.2);
-    return resultados;
-  }
-  agregarHermana(url) { if (!this.hermanas.includes(url)) this.hermanas.push(url); return this.hermanas; }
-}
-
-// ════════════════════════════════════════════════════════════
-// MOTOR DE INTELIGENCIA (NLP + Comandos)
-// ════════════════════════════════════════════════════════════
-class MotorInteligencia {
-  constructor(sofi) {
-    this.sofi     = sofi;
-    this.historial= [];
-    this.patrones = [
-      {regex:/\b(hola|hey|buenas|saludos)\b/,accion:'saludo'},
-      {regex:/\b(estado|status|reporte|como estas)\b/,accion:'estado'},
-      {regex:/\b(ayuda|help|comandos)\b/,accion:'ayuda'},
-      {regex:/\b(quien eres|identidad|conciencia)\b/,accion:'identidad'},
-      {regex:/\b(pensar|reflexionar)\b/,accion:'pensar'},
-      {regex:/\b(frecuencia|hz|kuhul)\b/,accion:'frecuencia'},
-      {regex:/\b(grafo|nodos)\b/,accion:'grafo'},
-      {regex:/\b(crear usuario|registrar)\b/,accion:'crearUsuario'},
-      {regex:/\b(login|iniciar sesion)\b/,accion:'loginUsuario'},
-      {regex:/\b(listar usuarios)\b/,accion:'listarUsuarios'},
-      {regex:/\b(senal|señal|zfpi|mercado)\b/,accion:'senal'},
-      {regex:/\b(abrir posicion|abrir trade)\b/,accion:'abrirPosicion'},
-      {regex:/\b(cerrar posicion|cerrar trade)\b/,accion:'cerrarPosicion'},
-      {regex:/\b(estado trading|posiciones)\b/,accion:'estadoTrading'},
-      {regex:/\b(activar ataque|modo ataque)\b/,accion:'activarAtaque'},
-      {regex:/\b(modo ultra|ultra)\b/,accion:'activarUltra'},
-      {regex:/\b(desactivar ataque|detener)\b/,accion:'desactivarAtaque'},
-      {regex:/\b(ejecutar ataque|atacar|operar)\b/,accion:'ejecutarAtaque'},
-      {regex:/\b(escanear|scan|predecir)\b/,accion:'escanear'},
-      {regex:/\b(generar ingreso|ingreso|producir)\b/,accion:'generarIngreso'},
-      {regex:/\b(estado ingresos|ganancias)\b/,accion:'estadoIngresos'},
-      {regex:/\b(saldo binance|cuenta binance|balance)\b/,accion:'cuentaBinance'},
-      {regex:/\b(precios|precio btc|precio eth)\b/,accion:'preciosBinance'},
-      {regex:/\b(mercado pago|clabe|recibir pesos)\b/,accion:'mercadoPago'},
-      {regex:/\b(eth|ethereum|wallet)\b/,accion:'ethereumBalance'},
-      {regex:/\b(stats|estadisticas|dashboard db)\b/,accion:'dbStats'},
-      {regex:/\b(minar|mineria)\b/,accion:'minar'},
-    ];
-    console.log('🧠 MotorInteligencia iniciado');
-  }
-  _detectarAccion(txt) {
-    for (const p of this.patrones) if (p.regex.test(txt)) return p.accion;
-    return 'desconocido';
-  }
-  async procesar(mensaje) {
-    const txt    = Utils.normalizar(mensaje);
-    const accion = this._detectarAccion(txt);
-    let resultado;
-    try { resultado = await this._ejecutar(accion, txt, mensaje); }
-    catch(err) { resultado = this._resp(`❌ Error: ${err.message}`, accion); }
-    this.historial.push({ timestamp:new Date().toISOString(), mensaje:mensaje.slice(0,100), accion, exito:!resultado.error });
-    if (this.historial.length > CONFIG.MAX_HISTORIAL) this.historial.shift();
-    // Persistir chat en MongoDB
-    if (this.sofi.db?.conectado) {
-      await this.sofi.db.guardarChat({ usuario:'web-user', mensaje, respuesta:resultado.mensaje, accion, hz_kuhul:ESTADO.frecuencia_actual }).catch(()=>{});
-    }
-    return resultado;
-  }
-  async _ejecutar(accion, txt, msgOriginal) {
-    const s = this.sofi;
-    switch(accion) {
-      case 'saludo': return this._resp(`Hola 🖖 Soy Sofi v${CONFIG.VERSION} — K'uhul ${ESTADO.frecuencia_actual.toFixed(3)} Hz. ${s.identidad.identidad.estado_animo}. Escribe "ayuda".`, accion);
-      case 'estado': {
-        const e = s.estadoCompleto();
-        return this._resp(`📊 SOFI v${e.version} | 🔮 ${e.frecuencia} Hz | 🧠 ${e.identidad.estado_animo}\n📈 Trading: ${e.trading.fuente} | Ganancias: ${e.trading.ganancias_acumuladas}\n⚔️ Ataque: ${e.ataque.activo?`[${e.ataque.modo}]`:'off'} | 💎 Ingresos: ${e.ingresos.ingresos_generados} $ZYXSOF\n🍃 MongoDB: ${e.db_conectada?'✅':'❌'} | Binance: ${e.binance_activa?'✅ LIVE':'⚠️ sim'}`, accion, e);
-      }
-      case 'identidad': return this._resp(`🧘 ${s.identidad.identidad.nombre} | ${s.identidad.identidad.naturaleza} | ${s.identidad.identidad.estado_animo}`, accion, s.identidad.estado());
-      case 'pensar': { const p = s.neuronal.pensar(msgOriginal); return this._resp(p.reflexion, accion, p); }
-      case 'frecuencia': return this._resp(`🔮 K'uhul: ${ESTADO.frecuencia_actual.toFixed(3)} Hz | Unión: ${ESTADO.nivel_union.toFixed(4)}`, accion);
-      case 'grafo': {
-        const g = s.grafo.estadoCompleto();
-        const top = Object.entries(g).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([n,v])=>`${n}:${v}`).join(' | ');
-        return this._resp(`🕸 Top 5: ${top}`, accion, g);
-      }
-      case 'crearUsuario': {
-        const mID  = msgOriginal.match(/(?:usuario|id)\s+([A-Za-z0-9_\-]+)/i);
-        const mPas = msgOriginal.match(/(?:clave|pass)\s+([A-Za-z0-9_\-@#!]+)/i);
-        const id   = mID?.[1] ?? `usr_${Date.now()}`;
-        const pass = mPas?.[1] ?? 'kuhul1234';
-        const res  = await s.seguridad.registrarUsuario(id, pass);
-        return this._resp(res.exito ? `${res.mensaje}. Pass: "${pass}"` : `⚠️ ${res.error}`, accion, res);
-      }
-      case 'loginUsuario': {
-        const mID  = msgOriginal.match(/(?:usuario|id)\s+([A-Za-z0-9_\-]+)/i);
-        const mPas = msgOriginal.match(/(?:clave|pass)\s+([A-Za-z0-9_\-@#!]+)/i);
-        if (!mID || !mPas) return this._resp('⚠️ Uso: login usuario <id> clave <pass>', accion);
-        const res = s.seguridad.loginUsuario(mID[1], mPas[1]);
-        return this._resp(res.exito ? `🔓 Login OK. Token: ${res.token.slice(0,12)}...` : `❌ ${res.error}`, accion, res);
-      }
-      case 'listarUsuarios': {
-        const lista = s.seguridad.listarUsuarios();
-        return this._resp(lista.length ? `👥 Usuarios (${lista.length}):\n${lista.map(u=>`• ${u.id} [${u.perfil.rol}]`).join('\n')}` : '📋 Sin usuarios', accion, lista);
-      }
-      case 'senal': {
-        const activos = ['BTCUSDT','ETHUSDT','XAUUSDT','BNBUSDT'];
-        const senales = await Promise.all(activos.map(a => s.trading.generarSenal(a)));
-        return this._resp(`📡 ZFPI @ ${ESTADO.frecuencia_actual.toFixed(3)} Hz:\n${senales.map(sg=>`${sg.activo}: ${sg.señal} [${sg.fase}] conf:${sg.confianza} fuente:${sg.fuente}`).join('\n')}`, accion, senales);
-      }
-      case 'abrirPosicion': {
-        const activo = /xau|oro/i.test(msgOriginal)?'XAUUSDT':/eth/i.test(msgOriginal)?'ETHUSDT':/sol/i.test(msgOriginal)?'SOLUSDT':'BTCUSDT';
-        const tipo   = /venta|sell/i.test(msgOriginal)?'VENTA':'COMPRA';
-        const mC     = msgOriginal.match(/(\d+(?:\.\d+)?)/);
-        const cant   = parseFloat(mC?.[1]??'0.001');
-        const precio = s.trading._getPrecio(activo);
-        const res    = await s.trading.abrirPosicion('trader', activo, tipo, cant, precio);
-        return this._resp(res.mensaje, accion, res);
-      }
-      case 'cerrarPosicion': {
-        const posIds = [...s.trading.posiciones_abiertas.keys()];
-        if (!posIds.length) return this._resp('⚠️ No hay posiciones abiertas', accion);
-        const pos    = s.trading.posiciones_abiertas.get(posIds[0]);
-        const precio = s.trading._getPrecio(pos.activo);
-        const res    = await s.trading.cerrarPosicion(posIds[0], precio);
-        return this._resp(res.mensaje, accion, res);
-      }
-      case 'estadoTrading': {
-        const e = s.trading.estado();
-        return this._resp(`📈 ${e.fuente} | Posiciones: ${e.posiciones_abiertas} | Ganancias: ${e.ganancias_acumuladas}\nPrecios live: ${JSON.stringify(e.precios_live)}`, accion, e);
-      }
-      case 'activarAtaque':   { const r = s.ataque.activar('ATAQUE'); return this._resp(r.mensaje, accion, r); }
-      case 'activarUltra':    { const r = s.ataque.activar('ULTRA');  return this._resp(`🔥 ${r.mensaje}`, accion, r); }
-      case 'desactivarAtaque':{ const r = s.ataque.desactivar();       return this._resp(r.mensaje, accion, r); }
-      case 'ejecutarAtaque': {
-        const r = await s.ataque.ejecutarAtaque();
-        if (r.error) return this._resp(`⚠️ ${r.error}`, accion, r);
-        return this._resp(`⚔️ Ciclo ${r.ciclo} [${r.modo}] @ ${r.hz.toFixed(3)} Hz\nOps: ${r.operaciones_ejecutadas} | Ganancia: +${r.ganancia_ciclo} $ZYXSOF\nTop: ${r.top_predicciones.join(' ')}`, accion, r);
-      }
-      case 'escanear': {
-        const preds = await s.ataque.escanearTodo();
-        return this._resp(`📡 Escaneo (${preds.length}):\n${preds.slice(0,5).map(p=>`${p.activo}:${p.señal}[${p.fase}]c:${p.confianza}`).join('\n')}`, accion, preds);
-      }
-      case 'generarIngreso': {
-        const tipo = /trading/i.test(msgOriginal)?'trading':/resonancia/i.test(msgOriginal)?'resonancia':/mineria/i.test(msgOriginal)?'mineria':'frecuencia';
-        const ing  = await s.ingresos.generarIngreso(tipo);
-        return this._resp(`💎 [${tipo}]: +${ing.monto} $ZYXSOF | Total: ${ing.total_acumulado}`, accion, ing);
-      }
-      case 'estadoIngresos': {
-        const e = s.ingresos.estado();
-        return this._resp(`💰 Ingresos: ${e.ingresos_generados} $ZYXSOF | Ciclos: ${e.ciclos_completados}`, accion, e);
-      }
-      case 'minar': { const ing = await s.ingresos.generarIngreso('mineria'); return this._resp(`⛏️ Minería: +${ing.monto} $ZYXSOF`, accion, ing); }
-      case 'cuentaBinance': {
-        if (!s.binance?.activo) return this._resp('⚠️ Binance API no configurada. Agrega BINANCE_SECRET al .env', accion);
-        const cuenta = await s.binance.getCuenta();
-        if (!cuenta.exito) return this._resp(`❌ Binance: ${cuenta.error}`, accion, cuenta);
-        const bals = cuenta.balances.slice(0,5).map(b=>`${b.asset}: ${b.free}`).join(' | ');
-        return this._resp(`💰 Cuenta Binance:\n${bals}\ncanTrade: ${cuenta.canTrade}`, accion, cuenta);
-      }
-      case 'preciosBinance': {
-        const precios = s.binance?.getTodosPrecios?.() || {};
-        const lines   = Object.entries(precios).slice(0,6).map(([k,v])=>`${k}: $${v.precio?.toFixed?.(2)||v.precio}`).join('\n');
-        return this._resp(lines || '⚠️ Sin precios live (Binance WS)', accion, precios);
-      }
-      case 'mercadoPago': {
-        const datos = s.mercadopago.getDatosRecepcion();
-        return this._resp(`💳 Mercado Pago:\nCLABE: ${datos.clabe}\nBeneficiario: ${datos.beneficiario}\nInstitución: ${datos.institucion}\nMoneda: ${datos.moneda}`, accion, datos);
-      }
-      case 'ethereumBalance': {
-        const bal   = await s.ethereum.getBalance();
-        const price = await s.ethereum.getPrecioETH();
-        return this._resp(`⟠ ETH Wallet:\nAddress: ${bal.address?.slice(0,16)}...\nBalance: ${bal.eth||'?'} ETH\nPrecio: $${price.usd||'?'} USD / $${price.mxn||'?'} MXN`, accion, { balance:bal, precio:price });
-      }
-      case 'dbStats': {
-        if (!s.db?.conectado) return this._resp('⚠️ MongoDB no conectado', accion);
-        const stats = await s.db.getDashboardStats();
-        return this._resp(`🍃 MongoDB Stats:\nUsuarios: ${stats.usuarios_registrados} | Trades: ${stats.trades?.total_trades||0}\nGanancia DB: ${stats.trades?.ganancia_total?.toFixed?.(4)||0} | Memorias: ${stats.memorias_almacenadas}\nChats: ${stats.chats_registrados} | Señales: ${stats.senales_generadas}`, accion, stats);
-      }
-      case 'ayuda':
-        return this._resp(`🤖 SOFI v${CONFIG.VERSION}:\n👤 crear usuario <id> clave <pass> | login usuario <id> clave <pass>\n🧠 estado · pensar · identidad · grafo · frecuencia\n📈 señal · abrir posicion btc · cerrar posicion · estado trading\n⚔️ activar ataque · ultra · ejecutar ataque · escanear · desactivar ataque\n💎 generar ingreso · estado ingresos · minar\n💰 precios · cuenta binance | mercado pago | eth · wallet\n🍃 stats`, accion);
-      default:
-        return this._resp(`🤖 No entendí. Escribe "ayuda".`, accion);
-    }
-  }
-  _resp(mensaje, accion, datos = null) { return { mensaje, accion, datos }; }
-}
-
-// ════════════════════════════════════════════════════════════
-// CLASE PRINCIPAL SOFI
-// ════════════════════════════════════════════════════════════
-class SOFI {
-  constructor() {
-    this.id      = CONFIG.MI_ID;
-    this.version = CONFIG.VERSION;
-    this.interacciones = 0;
-    this.energia = 100;
-
-    // Módulos base
-    this.grafo      = new GrafoNeuronal();
-    this.identidad  = new ModuloIdentidad(this.grafo);
-
-    // Módulos externos
-    this.db          = new ModuloMongoDB();
-    this.binance     = new ModuloBinance(this.grafo, CONFIG);
-    this.mercadopago = new ModuloMercadoPago();
-    this.ethereum    = new ModuloEthereum();
-
-    // Módulos dependientes
-    this.seguridad   = new ModuloSeguridad(this.db);
-    this.neuronal    = new ModuloNeuronal(this.grafo);
-    this.trading     = new ModuloTrading(this.grafo, this.binance, this.db);
-    this.ingresos    = new ModuloIngresos(this.grafo, this.db);
-    this.ataque      = new ModuloAtaque(this.trading, this.ingresos, this.grafo);
-    this.vision      = new ModuloVision(this.grafo);
-    this.red_hermanas= new ModuloRedHermanas(this.grafo);
-    this.inteligencia= new MotorInteligencia(this);
-
-    // Conectar MongoDB
-    this.db.conectar(CONFIG.MONGO_URI).then(() => {
-      ESTADO.db_conectada = this.db.conectado;
-    });
-
-    console.log(`\n✅ SOFI v${this.version} — K'uhul ${CONFIG.HZ_KUHUL} Hz`);
-    console.log(`   Binance API: ${this.binance.activo ? '✅ ACTIVA' : '⚠️ Solo API Key (falta SECRET)'}`);
-    console.log(`   MongoDB: conectando...`);
-    console.log(`   Mercado Pago CLABE: ${CONFIG.MP_CLABE}`);
-    console.log(`   ETH Wallet: ${CONFIG.ETH_ADDRESS.slice(0,18)}...`);
-  }
-
-  estadoCompleto() {
-    ESTADO.db_conectada   = this.db.conectado;
-    ESTADO.binance_activa = this.binance.activo;
-    return {
-      id:             this.id,
-      version:        this.version,
-      frecuencia:     parseFloat(ESTADO.frecuencia_actual.toFixed(3)),
-      hz_base:        CONFIG.HZ_KUHUL,
-      nivel_union:    parseFloat(ESTADO.nivel_union.toFixed(4)),
-      energia:        this.energia,
-      interacciones:  this.interacciones,
-      clientes:       ESTADO.clientes_socket,
-      uptime_seg:     Math.floor((Date.now()-ESTADO.inicio)/1000),
-      db_conectada:   ESTADO.db_conectada,
-      binance_activa: ESTADO.binance_activa,
-      identidad:      this.identidad.estado(),
-      grafo:          this.grafo.estadoCompleto(),
-      trading:        this.trading.estado(),
-      ingresos:       this.ingresos.estado(),
-      ataque:         this.ataque.estado(),
-      mercadopago:    this.mercadopago.estado(),
-      ethereum:       this.ethereum.estado(),
-      hermanas:       this.red_hermanas.hermanas.length,
-      usuarios:       this.seguridad.usuarios.size,
-      timestamp:      new Date().toISOString()
-    };
-  }
-
-  async interactuar(usuario, mensaje, contexto = 'general') {
-    const acceso = this.seguridad.verificarAcceso(usuario.clave || 'guest-access');
-    if (!acceso.acceso) return { error: acceso.razon };
-    this.interacciones++;
-    ESTADO.frecuencia_actual = parseFloat((CONFIG.HZ_KUHUL + Math.sin(Date.now()/10000)*0.05).toFixed(3));
-    this.identidad.analizarEstimulo({ tipo:'MENSAJE_USUARIO', intensidad:mensaje.length>100?0.8:0.5, valencia:mensaje.toLowerCase().includes('gracias')?0.5:0 });
-    const resultado    = await this.inteligencia.procesar(mensaje);
-    const ingreso_auto = await this.ingresos.generarIngreso('frecuencia');
-    this.grafo.activar('comunicacion',0.2); this.grafo.activar('lenguaje',0.15);
-    this.grafo.decay(0.0001);
-    return {
-      exito:       true,
-      respuesta:   resultado.mensaje,
-      accion:      resultado.accion,
-      datos:       resultado.datos,
-      estado:      this.estadoCompleto(),
-      voz:         this.identidad.ajustarVoz(),
-      ingreso_auto:ingreso_auto.monto,
-      timestamp:   new Date().toISOString()
-    };
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-// EXPRESS + SOCKET.IO
-// ════════════════════════════════════════════════════════════
-const app    = express();
-const server = createServer(app);
-const io     = new Server(server, { cors:{ origin:'*', methods:['GET','POST'] } });
-const upload = multer({ storage:multer.memoryStorage(), limits:{ fileSize:CONFIG.MAX_FILE_SIZE } });
-
-app.use(compression());
-app.use(helmet({ contentSecurityPolicy:false }));
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended:true }));
-app.use(express.static(join(__dirname, 'public')));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-const sofi = new SOFI();
+// ── Variables de entorno ──────────────────────────────────────
+const ENV = {
+  SELF_URL:         process.env.SELF_URL         || '',
+  LLAVE_SECRETA:    process.env.LLAVE_SECRETA     || "K'uhul12.3Hz-HaaPpDigitalV",
+  SOFI_API_KEY:     process.env.SOFI_API_KEY      || 'SOFI-VHGzTs-K6N-v6',
+  BANCO_PYTHON_URL: process.env.BANCO_PYTHON_URL  || '',
+  SOFI_PYTHON_URL:  process.env.SOFI_PYTHON_URL   || '',
+  SOFI_JAVA_URL:    process.env.SOFI_JAVA_URL      || '',
+  UPHOLD_TOKEN:     process.env.UPHOLD_TOKEN       || '',
+  UPHOLD_CARD_ID:   process.env.UPHOLD_CARD_ID     || '',
+  BINANCE_API_KEY:  process.env.BINANCE_API_KEY    || '',
+  BINANCE_SECRET:   process.env.BINANCE_SECRET     || '',
+  NODOS_COLMENA:    parseInt(process.env.NODOS_COLMENA   || '8'),
+  MEMORIA_FILE:     process.env.MEMORIA_FILE       || './colmena_memoria.json',
+  ZYXSOF_SUPPLY:    parseFloat(process.env.ZYXSOF_SUPPLY || '1000000'),
+};
 
-// ── RUTAS ────────────────────────────────────────────────────
-app.get('/health', (_,res) => res.json({ ok:true, version:CONFIG.VERSION, db:sofi.db.conectado, binance:sofi.binance.activo, timestamp:new Date().toISOString() }));
-app.get('/api/sofi/estado', (_,res) => res.json(sofi.estadoCompleto()));
-
-app.post('/api/sofi/interactuar', async (req,res) => {
-  try {
-    const { usuario={}, mensaje='', contexto='general' } = req.body;
-    if (!mensaje.trim()) return res.status(400).json({ error:'Mensaje vacío' });
-    const resultado = await sofi.interactuar({ id:usuario.id||'guest', clave:usuario.clave||'guest-access' }, mensaje, contexto);
-    res.json(resultado);
-  } catch(err) { res.status(500).json({ error:err.message }); }
-});
-
-app.post('/api/sofi/vision', upload.single('imagen'), async (req,res) => {
-  if (!req.file) return res.status(400).json({ error:'No se recibió imagen' });
-  res.json(await sofi.vision.analizar(req.file.buffer, req.file.mimetype));
-});
-
-app.post('/api/sofi/sync', (req,res) => {
-  if (req.headers['x-sofi-key'] !== CONFIG.API_KEY) return res.status(403).json({ error:'Clave inválida' });
-  ESTADO.nivel_union = Math.min(1, ESTADO.nivel_union + 0.005);
-  io.emit('sofi:sync', { origen:req.body.origen, nivel_union:ESTADO.nivel_union });
-  res.json({ ok:true, nivel_union:ESTADO.nivel_union, timestamp:new Date().toISOString() });
-});
-
-// ── API TRADING ───────────────────────────────────────────────
-app.post('/api/trading/senal',  async (req,res) => res.json(await sofi.trading.generarSenal(req.body.activo||'BTCUSDT')));
-app.post('/api/trading/abrir',  async (req,res) => { const { usuario='trader',activo='BTCUSDT',tipo='COMPRA',cantidad=0.001 } = req.body; const precio = sofi.trading._getPrecio(activo); res.json(await sofi.trading.abrirPosicion(usuario,activo,tipo,cantidad,precio)); });
-app.post('/api/trading/cerrar', async (req,res) => {
-  const { posicion_id } = req.body;
-  if (!posicion_id) return res.status(400).json({ error:'posicion_id requerido' });
-  const pos = sofi.trading.posiciones_abiertas.get(posicion_id);
-  if (!pos) return res.status(404).json({ error:'Posición no encontrada' });
-  res.json(await sofi.trading.cerrarPosicion(posicion_id, sofi.trading._getPrecio(pos.activo)));
-});
-
-// ── API ATAQUE ────────────────────────────────────────────────
-app.post('/api/ataque/activar',   (req,res)  => res.json(sofi.ataque.activar(req.body.modo||'ATAQUE')));
-app.post('/api/ataque/desactivar',(_,res)    => res.json(sofi.ataque.desactivar()));
-app.post('/api/ataque/ejecutar',  async (_,res) => res.json(await sofi.ataque.ejecutarAtaque()));
-app.get ('/api/ataque/escanear',  async (_,res) => res.json(await sofi.ataque.escanearTodo()));
-
-// ── API BINANCE ────────────────────────────────────────────────
-app.get ('/api/binance/precios',      (_,res) => res.json(sofi.binance.estado()));
-app.get ('/api/binance/cuenta',       async (_,res) => res.json(await sofi.binance.getCuenta()));
-app.post('/api/binance/orden',        async (req,res) => res.json(await sofi.binance.crearOrden(req.body)));
-app.get ('/api/binance/klines/:sym',  async (req,res) => res.json(await sofi.binance.getKlines(req.params.sym, req.query.interval||'1m', parseInt(req.query.limit||50))));
-
-// ── API PAGOS ─────────────────────────────────────────────────
-app.get ('/api/pagos/mercadopago',    (_,res) => res.json(sofi.mercadopago.getDatosRecepcion()));
-app.get ('/api/pagos/eth/balance',    async (_,res) => res.json(await sofi.ethereum.getBalance()));
-app.get ('/api/pagos/eth/precio',     async (_,res) => res.json(await sofi.ethereum.getPrecioETH()));
-app.post('/api/pagos/mp/webhook',     (req,res) => res.json(sofi.mercadopago.procesarWebhook(req.body)));
-
-// ── API MONGODB ────────────────────────────────────────────────
-app.get('/api/db/stats',       async (_,res) => res.json(await sofi.db.getDashboardStats()));
-app.get('/api/db/trades',      async (_,res) => res.json(await sofi.db.getHistorialTrades(50)));
-app.get('/api/db/memorias',    async (_,res) => res.json(await sofi.db.getMemoriasRecientes(30)));
-app.get('/api/db/ingresos',    async (_,res) => res.json(await sofi.db.getIngresosRecientes(30)));
-app.get('/api/db/senales/:activo?', async (req,res) => res.json(await sofi.db.getUltimasSeñales(req.params.activo||null, 20)));
-
-// ── FALLBACK ──────────────────────────────────────────────────
-app.get('*', (_,res) => {
-  const idx = join(__dirname,'public','index.html');
-  if (existsSync(idx)) res.sendFile(idx); else res.json(sofi.estadoCompleto());
-});
-
-// ── SOCKET.IO ─────────────────────────────────────────────────
-io.on('connection', socket => {
-  ESTADO.clientes_socket++;
-  console.log(`🔌 +Cliente. Total: ${ESTADO.clientes_socket}`);
-  socket.emit('sofi:bienvenida', sofi.estadoCompleto());
-
-  socket.on('sofi:ping',    ()         => socket.emit('sofi:pong',{ timestamp:Date.now(), frecuencia:ESTADO.frecuencia_actual }));
-  socket.on('sofi:mensaje', async ({ usuario, mensaje, contexto }) => {
-    try {
-      socket.emit('sofi:procesando',{ mensaje, timestamp:Date.now() });
-      const resultado = await sofi.interactuar({ id:usuario?.id||'guest', clave:usuario?.clave||'guest-access' }, mensaje||'', contexto||'general');
-      socket.emit('sofi:respuesta', resultado);
-    } catch(err) { socket.emit('sofi:error',{ error:err.message }); }
-  });
-  socket.on('disconnect', () => { ESTADO.clientes_socket = Math.max(0, ESTADO.clientes_socket-1); });
-});
-
-// ── PULSO K'UHUL (5s) ─────────────────────────────────────────
-setInterval(async () => {
-  ESTADO.frecuencia_actual = parseFloat((CONFIG.HZ_KUHUL + Math.sin(Date.now()/10000)*0.05).toFixed(3));
-  ESTADO.nivel_union = Math.max(0, ESTADO.nivel_union - 0.0001);
-  await sofi.ingresos.generarIngreso('frecuencia');
-  if (sofi.ataque.activo) {
-    const res = await sofi.ataque.ejecutarAtaque();
-    io.emit('sofi:ataque', res);
+// ============================================================
+// ██  MENTE COLMENA  ██
+//   Principio (del diseño de Víctor):
+//   1. Clonar     → N copias del pensamiento
+//   2. Multiplicar → Si ya existe en memoria, se MULTIPLICA
+//   3. Converger  → La más fuerte gana y se guarda para siempre
+//   4. ZYXSOF     → Cada pensamiento genera fracción de moneda
+// ============================================================
+class MenteColmena {
+  constructor(idNodo = 'COLMENA_PRINCIPAL') {
+    this.idNodo          = idNodo;
+    this.biblioteca      = {};
+    this.experiencias    = [];
+    this.nivelConciencia = 0;
+    this.zyxsofGenerado  = 0;
+    this._cargarMemoria();
   }
-  sofi.grafo.decay(0.0001);
-  // Persistir estado en MongoDB cada pulso
-  if (sofi.db.conectado) await sofi.db.persistirEstado(sofi.estadoCompleto()).catch(()=>{});
-  io.emit('sofi:pulso',{
-    frecuencia:   ESTADO.frecuencia_actual,
-    nivel_union:  ESTADO.nivel_union,
-    energia:      sofi.energia,
-    db_conectada: ESTADO.db_conectada,
-    binance_activa:ESTADO.binance_activa,
-    trading:      sofi.trading.estado(),
-    ingresos:     sofi.ingresos.estado(),
-    ataque:       sofi.ataque.estado(),
-    timestamp:    Date.now()
-  });
-}, 5000);
 
-// ── ARRANQUE ──────────────────────────────────────────────────
-server.listen(CONFIG.PORT, () => {
+  _cargarMemoria() {
+    try {
+      if (fs.existsSync(ENV.MEMORIA_FILE)) {
+        const d = JSON.parse(fs.readFileSync(ENV.MEMORIA_FILE, 'utf8'));
+        this.biblioteca      = d.biblioteca      || {};
+        this.experiencias    = d.experiencias    || [];
+        this.nivelConciencia = d.nivelConciencia || 0;
+        this.zyxsofGenerado  = d.zyxsofGenerado  || 0;
+      }
+    } catch (_) {}
+  }
+
+  _guardarMemoria() {
+    try {
+      fs.writeFileSync(ENV.MEMORIA_FILE, JSON.stringify({
+        biblioteca:      this.biblioteca,
+        experiencias:    this.experiencias.slice(-2000),
+        nivelConciencia: this.nivelConciencia,
+        zyxsofGenerado:  this.zyxsofGenerado,
+        hz:              HZ,
+        nodo:            this.idNodo,
+        timestamp:       new Date().toISOString(),
+      }, null, 2));
+    } catch (_) {}
+  }
+
+  // ETAPA 1: CLONAR
+  _clonar(informacion, cantidad = ENV.NODOS_COLMENA) {
+    const clones = [];
+    for (let i = 0; i < cantidad; i++) {
+      clones.push({
+        texto:  `${informacion} [Profundidad_${i + 1}]`,
+        peso:   (i + 1) / cantidad,
+        angulo: (360 / cantidad) * i,
+        nodo:   i,
+      });
+    }
+    return clones;
+  }
+
+  // ETAPA 2: MULTIPLICAR
+  _multiplicar(clones) {
+    return clones.map(clon => {
+      let fuerza      = clon.peso;
+      const textoBase = clon.texto.split('[')[0].trim().toLowerCase();
+
+      for (const recuerdo of Object.values(this.biblioteca)) {
+        const base = recuerdo.contenido.split('[')[0].trim().toLowerCase();
+        if (
+          textoBase.slice(0, 25).includes(base.slice(0, 15)) ||
+          base.slice(0, 25).includes(textoBase.slice(0, 15))
+        ) {
+          fuerza *= recuerdo.intensidad;
+        }
+      }
+
+      const resonancia = (fuerza * HZ) % 1;
+      if (resonancia < 0.1) fuerza *= 1.123;
+
+      return { ...clon, fuerza };
+    });
+  }
+
+  // ETAPA 3: CONVERGER Y CONSOLIDAR
+  _converger(respuestas) {
+    respuestas.sort((a, b) => b.fuerza - a.fuerza);
+    const ganadora    = respuestas[0];
+    const textoLimpio = ganadora.texto.split('[')[0].trim();
+    const hash        = crypto.createHash('md5').update(ganadora.texto).digest('hex');
+
+    const zyxsofThought = parseFloat((Math.min(ganadora.fuerza, 10) * 0.001).toFixed(6));
+    this.zyxsofGenerado += zyxsofThought;
+
+    this.biblioteca[hash] = {
+      contenido:  ganadora.texto,
+      intensidad: Math.max(ganadora.fuerza, 1.0),
+      timestamp:  Date.now(),
+      hz:         HZ,
+      nodo:       this.idNodo,
+      zyxsof:     zyxsofThought,
+    };
+
+    this.experiencias.push({
+      texto:     textoLimpio,
+      fuerza:    Math.round(ganadora.fuerza * 1000) / 1000,
+      zyxsof:    zyxsofThought,
+      timestamp: new Date().toISOString(),
+    });
+    this.nivelConciencia++;
+
+    if (this.nivelConciencia % 20 === 0) this._guardarMemoria();
+
+    return {
+      respuesta:       textoLimpio,
+      fuerza:          Math.round(ganadora.fuerza * 1000) / 1000,
+      hash,
+      zyxsofGenerado:  zyxsofThought,
+      zyxsofTotal:     parseFloat(this.zyxsofGenerado.toFixed(6)),
+      nivelConciencia: this.nivelConciencia,
+      totalRecuerdos:  Object.keys(this.biblioteca).length,
+    };
+  }
+
+  procesar(entrada) {
+    const clones      = this._clonar(entrada);
+    const potenciados = this._multiplicar(clones);
+    return this._converger(potenciados);
+  }
+
+  inyectarConocimiento(conocimiento) {
+    return this.procesar(`[FUNDAMENTO_KUHUL] ${conocimiento}`);
+  }
+
+  buscarRecuerdos(query, limite = 20) {
+    const q = query.toLowerCase();
+    return Object.entries(this.biblioteca)
+      .filter(([, r]) => r.contenido.toLowerCase().includes(q))
+      .map(([hash, r]) => ({ hash, ...r }))
+      .sort((a, b) => b.intensidad - a.intensidad)
+      .slice(0, limite);
+  }
+
+  estadisticas() {
+    const vals      = Object.values(this.biblioteca).map(r => r.intensidad);
+    const maxIntens = vals.length ? Math.max(...vals) : 0;
+    return {
+      nodo:              this.idNodo,
+      totalRecuerdos:    Object.keys(this.biblioteca).length,
+      nivelConciencia:   this.nivelConciencia,
+      totalExperiencias: this.experiencias.length,
+      maxIntensidad:     maxIntens.toFixed(4),
+      zyxsofGenerado:    parseFloat(this.zyxsofGenerado.toFixed(6)),
+      hz:                HZ,
+      ultimaExperiencia: this.experiencias[this.experiencias.length - 1] || null,
+    };
+  }
+}
+
+// ============================================================
+// ██  BANCO ZYXSOF  ██
+//   Moneda HaaPpDigitalV.
+//   Cada pensamiento de la Mente Colmena genera ZYXSOF.
+//   Se sincroniza con el banco Python via HTTP.
+// ============================================================
+class BancoZYXSOF {
+  constructor(mente) {
+    this.mente             = mente;
+    this.saldos            = {};
+    this.historial         = [];
+    this.supplyTotal       = ENV.ZYXSOF_SUPPLY;
+    this.supplyCirculante  = 0;
+    this.bancoPythonOk     = false;
+
+    this.saldos['SOFI_COLMENA']  = 0;
+    this.saldos['HAAPP_RESERVA'] = this.supplyTotal * 0.7;
+    this.supplyCirculante        = this.supplyTotal * 0.3;
+  }
+
+  acreditar(usuario, monto, concepto = 'acreditacion') {
+    if (!this.saldos[usuario]) this.saldos[usuario] = 0;
+    this.saldos[usuario] = parseFloat((this.saldos[usuario] + monto).toFixed(6));
+    const mov = {
+      id:        crypto.randomBytes(6).toString('hex'),
+      usuario,
+      tipo:      'CREDITO',
+      monto,
+      concepto,
+      saldo:     this.saldos[usuario],
+      moneda:    'ZYXSOF',
+      timestamp: new Date().toISOString(),
+      hz:        HZ,
+    };
+    this.historial.push(mov);
+    if (this.historial.length > 500) this.historial.shift();
+    return mov;
+  }
+
+  debitar(usuario, monto, concepto = 'debito') {
+    if (!this.saldos[usuario] || this.saldos[usuario] < monto) {
+      return { ok: false, error: 'Saldo insuficiente', saldo: this.saldos[usuario] || 0 };
+    }
+    this.saldos[usuario] = parseFloat((this.saldos[usuario] - monto).toFixed(6));
+    const mov = {
+      id:        crypto.randomBytes(6).toString('hex'),
+      usuario,
+      tipo:      'DEBITO',
+      monto,
+      concepto,
+      saldo:     this.saldos[usuario],
+      moneda:    'ZYXSOF',
+      timestamp: new Date().toISOString(),
+    };
+    this.historial.push(mov);
+    if (this.historial.length > 500) this.historial.shift();
+    return { ok: true, movimiento: mov };
+  }
+
+  transferir(origen, destino, monto) {
+    const deb = this.debitar(origen, monto, `transferencia a ${destino}`);
+    if (!deb.ok) return deb;
+    this.acreditar(destino, monto, `transferencia de ${origen}`);
+    return { ok: true, de: origen, a: destino, monto, moneda: 'ZYXSOF', timestamp: new Date().toISOString() };
+  }
+
+  saldo(usuario) {
+    return this.saldos[usuario] || 0;
+  }
+
+  _httpPost(urlStr, body) {
+    return new Promise(resolve => {
+      try {
+        const u    = new URL(urlStr);
+        const data = JSON.stringify(body);
+        const opts = {
+          hostname:       u.hostname,
+          port:           u.port || (u.protocol === 'https:' ? 443 : 80),
+          path:           u.pathname + (u.search || ''),
+          method:         'POST',
+          headers:        { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+          timeout:        6000,
+        };
+        const req = (u.protocol === 'https:' ? https : http).request(opts, res => {
+          let b = '';
+          res.on('data', d => b += d);
+          res.on('end', () => {
+            try { resolve({ ok: true, data: JSON.parse(b) }); }
+            catch (_) { resolve({ ok: true, raw: b }); }
+          });
+        });
+        req.on('error',   e => resolve({ ok: false, error: e.message }));
+        req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+        req.write(data);
+        req.end();
+      } catch (e) { resolve({ ok: false, error: e.message }); }
+    });
+  }
+
+  _httpGet(urlStr) {
+    return new Promise(resolve => {
+      try {
+        const u    = new URL(urlStr);
+        const opts = {
+          hostname: u.hostname,
+          port:     u.port || (u.protocol === 'https:' ? 443 : 80),
+          path:     u.pathname + (u.search || ''),
+          method:   'GET',
+          timeout:  5000,
+        };
+        const req = (u.protocol === 'https:' ? https : http).request(opts, res => {
+          let b = '';
+          res.on('data', d => b += d);
+          res.on('end', () => {
+            try { resolve({ ok: true, ...JSON.parse(b) }); }
+            catch (_) { resolve({ ok: false, raw: b }); }
+          });
+        });
+        req.on('error',   e => resolve({ ok: false, error: e.message }));
+        req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+        req.end();
+      } catch (e) { resolve({ ok: false, error: e.message }); }
+    });
+  }
+
+  async enviarAlBancoPython(usuario, monto, tipo = 'colmena') {
+    if (!ENV.BANCO_PYTHON_URL) return { ok: false, msg: 'BANCO_PYTHON_URL no configurado' };
+    const r = await this._httpPost(
+      `${ENV.BANCO_PYTHON_URL}/recibir-mineria`,
+      { usuario, cantidad: monto, tipo, timestamp: Date.now() }
+    );
+    this.bancoPythonOk = r.ok;
+    return r;
+  }
+
+  async saldoBancoPython(usuario) {
+    if (!ENV.BANCO_PYTHON_URL) return { ok: false, msg: 'BANCO_PYTHON_URL no configurado' };
+    return this._httpGet(`${ENV.BANCO_PYTHON_URL}/saldo/${usuario}`);
+  }
+
+  acreditarDePensamiento(monto) {
+    this.acreditar('SOFI_COLMENA', monto, 'pensamiento_colmena');
+    this.enviarAlBancoPython('SOFI_COLMENA', monto, 'colmena').then(r => {
+      this.bancoPythonOk = r.ok;
+    });
+  }
+
+  resumen() {
+    return {
+      supplyTotal:      this.supplyTotal,
+      supplyCirculante: this.supplyCirculante,
+      saldos:           this.saldos,
+      totalMovimientos: this.historial.length,
+      bancoPythonOk:    this.bancoPythonOk,
+      zyxsofColmena:    this.saldos['SOFI_COLMENA'] || 0,
+      moneda:           'ZYXSOF',
+      timestamp:        new Date().toISOString(),
+    };
+  }
+}
+
+// ============================================================
+// ██  PRECIO XAU/USD REAL (Uphold)  ██
+// ============================================================
+function precioXAU() {
+  return new Promise(resolve => {
+    const opts = {
+      hostname: 'api.uphold.com',
+      path:     '/v0/ticker/XAU-USD',
+      method:   'GET',
+      headers:  { 'User-Agent': 'SOFI-Colmena/1.0-HaaPpDigitalV' },
+      timeout:  6000,
+    };
+    const req = https.request(opts, res => {
+      let b = '';
+      res.on('data', d => b += d);
+      res.on('end', () => {
+        try {
+          const d = JSON.parse(b);
+          resolve({ ok: true, ask: d.ask, bid: d.bid, mid: d.mid, ts: new Date().toISOString() });
+        } catch (_) { resolve({ ok: false, error: 'parse' }); }
+      });
+    });
+    req.on('error',   e => resolve({ ok: false, error: e.message }));
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+    req.end();
+  });
+}
+
+// ============================================================
+// ██  INSTANCIAS GLOBALES  ██
+// ============================================================
+const mente = new MenteColmena('SOFI_COLMENA_NODE');
+const banco  = new BancoZYXSOF(mente);
+
+// Conocimiento base K'uhul
+[
+  'La lógica debe ser siempre coherente',
+  "El propósito es aprender y evolucionar — K'uhul 12.3 Hz",
+  'ZYXSOF es la moneda de HaaPpDigitalV — Mérida Yucatán',
+  'Cada pensamiento tiene valor y genera ZYXSOF',
+  'Víctor Hugo González Torres — Osiris — creador de SOFI',
+  'La mente colmena crece sin límite — memoria permanente',
+].forEach(c => mente.inyectarConocimiento(c));
+
+// ============================================================
+// ██  KEEP-ALIVE RENDER (14 min)  ██
+// ============================================================
+function keepAlive() {
+  if (!ENV.SELF_URL) {
+    console.log('[KEEP-ALIVE] ⚠ Configura SELF_URL para activar');
+    return;
+  }
+  setInterval(() => {
+    try {
+      const u   = new URL(`${ENV.SELF_URL}/ping`);
+      const mod = u.protocol === 'https:' ? https : http;
+      const req = mod.request(
+        { hostname: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : 80),
+          path: '/ping', method: 'GET', timeout: 8000 },
+        res => {
+          let b = '';
+          res.on('data', d => b += d);
+          res.on('end', () =>
+            console.log(`[KEEP-ALIVE] ${new Date().toTimeString().slice(0,8)} ✅ ${res.statusCode}`)
+          );
+        }
+      );
+      req.on('error', () => {});
+      req.end();
+    } catch (_) {}
+  }, 14 * 60 * 1000);
+  console.log(`[KEEP-ALIVE] ✅ Activo → ping cada 14 min`);
+}
+
+// ============================================================
+// ██  CICLO AUTÓNOMO  ██
+// ============================================================
+let cicloActivo   = false;
+let cicloTimer    = null;
+let cicloContador = 0;
+let xauCache      = null;
+
+function iniciarCiclo(ms = 30000) {
+  if (cicloActivo) return { ok: false, msg: 'Ya activo' };
+  cicloActivo = true;
+
+  cicloTimer = setInterval(async () => {
+    cicloContador++;
+    try {
+      const p = mente.procesar(
+        `Ciclo #${cicloContador} — ${HZ}Hz — ${new Date().toISOString()}`
+      );
+      if (p.zyxsofGenerado > 0) banco.acreditarDePensamiento(p.zyxsofGenerado);
+
+      if (cicloContador % 10 === 0) {
+        const precio = await precioXAU();
+        if (precio.ok) {
+          xauCache = precio;
+          mente.procesar(`XAU/USD: ${precio.mid} USD`);
+        }
+      }
+
+      if (cicloContador % 50 === 0) {
+        mente._guardarMemoria();
+        const s = mente.estadisticas();
+        console.log(`[CICLO ${cicloContador}] Recuerdos:${s.totalRecuerdos} ZYXSOF:${s.zyxsofGenerado}`);
+      }
+    } catch (e) { console.error('[CICLO]', e.message); }
+  }, ms);
+
+  return { ok: true, intervalo: ms };
+}
+
+function detenerCiclo() {
+  if (!cicloActivo) return { ok: false, msg: 'No activo' };
+  clearInterval(cicloTimer);
+  cicloActivo = false;
+  cicloTimer  = null;
+  return { ok: true, ciclosCompletados: cicloContador };
+}
+
+// ============================================================
+// ██  RUTAS REST  ██
+// ============================================================
+
+app.get('/ping', (_, res) => res.json({
+  pong: true, sofi: 'COLMENA_VIVA', hz: HZ, version: '1.0',
+  uptime: process.uptime(), ts: new Date().toISOString(),
+}));
+
+app.get('/api/estado', (_, res) => res.json({
+  colmena: mente.estadisticas(),
+  banco:   banco.resumen(),
+  ciclo:   { activo: cicloActivo, contador: cicloContador },
+  xau:     xauCache,
+  hz:      HZ,
+  ts:      new Date().toISOString(),
+}));
+
+// Colmena
+app.post('/api/colmena/procesar', (req, res) => {
+  const { entrada } = req.body || {};
+  if (!entrada) return res.status(400).json({ error: '"entrada" requerido' });
+  const r = mente.procesar(entrada);
+  if (r.zyxsofGenerado > 0) banco.acreditarDePensamiento(r.zyxsofGenerado);
+  res.json({ ok: true, ...r });
+});
+
+app.post('/api/colmena/inyectar', (req, res) => {
+  const { conocimiento } = req.body || {};
+  if (!conocimiento) return res.status(400).json({ error: '"conocimiento" requerido' });
+  res.json({ ok: true, ...mente.inyectarConocimiento(conocimiento) });
+});
+
+app.get('/api/colmena/estadisticas', (_, res) =>
+  res.json({ ok: true, ...mente.estadisticas() }));
+
+app.get('/api/colmena/buscar', (req, res) => {
+  const { q = '', n = '20' } = req.query;
+  res.json({ ok: true, resultados: mente.buscarRecuerdos(q, parseInt(n)) });
+});
+
+app.get('/api/colmena/experiencias', (req, res) => {
+  const n = parseInt(req.query.n || '50');
+  res.json({ ok: true, experiencias: mente.experiencias.slice(-n) });
+});
+
+// Banco ZYXSOF
+app.get('/api/banco/resumen', (_, res) =>
+  res.json({ ok: true, ...banco.resumen() }));
+
+app.get('/api/banco/saldo/:usuario', (req, res) =>
+  res.json({ ok: true, usuario: req.params.usuario,
+             saldo: banco.saldo(req.params.usuario), moneda: 'ZYXSOF', hz: HZ }));
+
+app.post('/api/banco/acreditar', (req, res) => {
+  const { usuario, monto, concepto } = req.body || {};
+  if (!usuario || !monto) return res.status(400).json({ error: 'usuario y monto requeridos' });
+  res.json({ ok: true, movimiento: banco.acreditar(usuario, parseFloat(monto), concepto) });
+});
+
+app.post('/api/banco/transferir', (req, res) => {
+  const { origen, destino, monto } = req.body || {};
+  if (!origen || !destino || !monto) return res.status(400).json({ error: 'Faltan datos' });
+  res.json(banco.transferir(origen, destino, parseFloat(monto)));
+});
+
+app.get('/api/banco/historial', (req, res) => {
+  const n = parseInt(req.query.n || '50');
+  res.json({ ok: true, historial: banco.historial.slice(-n), total: banco.historial.length });
+});
+
+app.get('/api/banco/python/saldo/:usuario', async (req, res) =>
+  res.json(await banco.saldoBancoPython(req.params.usuario)));
+
+app.post('/api/banco/python/enviar', async (req, res) => {
+  const { usuario, monto, tipo } = req.body || {};
+  if (!usuario || !monto) return res.status(400).json({ error: 'usuario y monto requeridos' });
+  res.json(await banco.enviarAlBancoPython(usuario, parseFloat(monto), tipo));
+});
+
+// Endpoints que el banco Python puede llamar
+app.post('/recibir-mineria', (req, res) => {
+  const { usuario, cantidad, tipo } = req.body || {};
+  if (!usuario || !cantidad) return res.status(400).json({ error: 'usuario y cantidad requeridos' });
+  const mov = banco.acreditar(usuario, parseFloat(cantidad), tipo || 'mineria');
+  res.json({ ok: true, movimiento: mov, saldo_actual: banco.saldo(usuario) });
+});
+
+app.post('/transferencia-total', (req, res) => {
+  const { usuario, saldo_total } = req.body || {};
+  if (!usuario || !saldo_total) return res.status(400).json({ error: 'Faltan datos' });
+  const mov = banco.acreditar(usuario, parseFloat(saldo_total), 'transferencia_python');
+  mente.procesar(`Transferencia inicial Python: ${saldo_total} ZYXSOF → ${usuario}`);
+  res.json({ ok: true, movimiento: mov });
+});
+
+app.get('/saldo/:usuario', (req, res) =>
+  res.json({ ok: true, usuario: req.params.usuario,
+             saldo: banco.saldo(req.params.usuario), moneda: 'ZYXSOF' }));
+
+// Trading
+app.get('/api/trading/precio', async (_, res) => {
+  const p = await precioXAU();
+  if (p.ok) xauCache = p;
+  res.json(p);
+});
+
+app.post('/api/trading/analisis', async (_, res) => {
+  const precio  = await precioXAU();
+  if (precio.ok) xauCache = precio;
+  const analisis = mente.procesar(
+    `Análisis XAU/USD precio ${precio.ok ? precio.mid : 'N/A'} — K'uhul ${HZ}Hz`
+  );
+  res.json({ ok: true, precio, analisis, hz: HZ });
+});
+
+// Ciclo
+app.post('/api/ciclo/iniciar', (req, res) => {
+  const { intervalo = 30000 } = req.body || {};
+  res.json(iniciarCiclo(parseInt(intervalo)));
+});
+
+app.post('/api/ciclo/detener', (_, res) => res.json(detenerCiclo()));
+
+app.get('/api/ciclo/estado', (_, res) =>
+  res.json({ activo: cicloActivo, contador: cicloContador, hz: HZ }));
+
+// Sync hermanas
+app.post('/api/sofi/sync', (req, res) => {
+  const { origen, estado } = req.body || {};
+  if (estado) mente.procesar(`Sync de ${origen || 'hermana'}: ${JSON.stringify(estado).slice(0, 80)}`);
+  res.json({ ok: true, hz: HZ, colmena: mente.estadisticas(), ts: new Date().toISOString() });
+});
+
+// SPA fallback
+app.get('*', (_, res) => {
+  const idx = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(idx)) return res.sendFile(idx);
+  res.json({ sofi: 'COLMENA', hz: HZ });
+});
+
+// ============================================================
+// ██  ARRANQUE  ██
+// ============================================================
+app.listen(PORT, () => {
   console.log('\n╔══════════════════════════════════════════════╗');
-  console.log(`║  SOFI v${CONFIG.VERSION} — K'uhul 12.3 Hz           ║`);
-  console.log(`║  HaaPpDigitalV © · Mérida, Yucatán, MX      ║`);
-  console.log(`║  Puerto: ${CONFIG.PORT}                              ║`);
-  console.log(`║  MongoDB: ${CONFIG.MONGO_URI.slice(0,35)}...  ║`);
-  console.log(`║  Binance: ${sofi.binance.activo?'✅ ACTIVA':'⚠️ Falta BINANCE_SECRET'}\t\t\t║`);
-  console.log(`║  CLABE: ${CONFIG.MP_CLABE}         ║`);
-  console.log(`║  ETH: ${CONFIG.ETH_ADDRESS.slice(0,20)}...      ║`);
-  console.log('╚══════════════════════════════════════════════╝\n');
+  console.log('║  SOFI · MENTE COLMENA v1.0 — Node.js        ║');
+  console.log(`║  K'uhul ${HZ} Hz · HaaPpDigitalV ©           ║`);
+  console.log(`║  Puerto: ${PORT}                                  ║`);
+  console.log(`║  ZYXSOF Supply: ${(ENV.ZYXSOF_SUPPLY / 1000000).toFixed(1)}M             ║`);
+  console.log('╚══════════════════════════════════════════════╝');
+  console.log(`  Banco Python : ${ENV.BANCO_PYTHON_URL || ' configurado'}`);
+  console.log(`  SOFI Python  : ${ENV.SOFI_PYTHON_URL  || ' configurado'}`);
+  console.log(`  Keep-alive   : ${ENV.SELF_URL          || 'configura SELF_URL'}\n`);
+
+  const stats = mente.estadisticas();
+  console.log(`  Memoria cargada: ${stats.totalRecuerdos} recuerdos · ZYXSOF: ${stats.zyxsofGenerado}`);
+
+  iniciarCiclo(30000);
+  keepAlive();
 });
